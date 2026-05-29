@@ -218,6 +218,53 @@ class ForwardProxyServer:
             except Exception:
                 pass
 
+    def _should_intercept(self, hostname: str) -> bool:
+        """Return True only for the target API hostname we want to MitM."""
+        if self._local_reverse_target:
+            from urllib.parse import urlparse as _urlparse
+            target_host = _urlparse(self._local_reverse_target).hostname or ""
+            if hostname == target_host:
+                return True
+        return False
+
+    async def _tcp_passthrough(
+        self,
+        hostname: str,
+        port: int,
+        reader: asyncio.StreamReader,
+        writer: asyncio.StreamWriter,
+    ) -> None:
+        """Relay TCP bytes directly to upstream without TLS termination."""
+        try:
+            up_reader, up_writer = await asyncio.wait_for(
+                asyncio.open_connection(hostname, port), timeout=15
+            )
+        except (OSError, asyncio.TimeoutError) as e:
+            log.debug(f"Passthrough connect failed {hostname}:{port}: {e}")
+            return
+
+        async def _pipe(src: asyncio.StreamReader, dst: asyncio.StreamWriter) -> None:
+            try:
+                while True:
+                    data = await src.read(65536)
+                    if not data:
+                        break
+                    dst.write(data)
+                    await dst.drain()
+            except (ConnectionError, asyncio.CancelledError):
+                pass
+            finally:
+                try:
+                    dst.close()
+                except Exception:
+                    pass
+
+        await asyncio.gather(
+            _pipe(reader, up_writer),
+            _pipe(up_reader, writer),
+            return_exceptions=True,
+        )
+
     async def _handle_connect(
         self,
         authority: str,
@@ -245,6 +292,12 @@ class ForwardProxyServer:
         # Send 200 Connection Established
         writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
         await writer.drain()
+
+        # Non-target hosts (e.g. OAuth/auth endpoints) are passed through as raw
+        # TCP tunnels without TLS termination so login flows work correctly.
+        if not self._should_intercept(hostname):
+            await self._tcp_passthrough(hostname, port, reader, writer)
+            return
 
         # TLS termination via a local loopback bounce:
         # 1. Start a temporary TLS server on localhost:0
