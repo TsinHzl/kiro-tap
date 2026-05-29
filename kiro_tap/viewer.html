@@ -4398,6 +4398,21 @@ function getMessages(body) {
   if (isGeminiRequestBody(body)) {
     return geminiMessages(body).filter(m => hasDisplayContent(m.content));
   }
+  // Kiro conversationState format
+  if (body.conversationState) {
+    const cs = body.conversationState;
+    const msgs = [];
+    if (Array.isArray(cs.history)) {
+      for (const item of cs.history) {
+        if (item.userInputMessage) msgs.push({role: 'user', content: item.userInputMessage.content});
+        if (item.assistantResponseMessage) msgs.push({role: 'assistant', content: item.assistantResponseMessage.content});
+      }
+    }
+    if (cs.currentMessage?.userInputMessage) {
+      msgs.push({role: 'user', content: cs.currentMessage.userInputMessage.content});
+    }
+    return msgs.filter(m => hasDisplayContent(m.content));
+  }
   if (Array.isArray(body.input)) {
     const normalizedInput = normalizeWebSocketDerivedInput(body.input);
     const messages = normalizedInput.filter(item => {
