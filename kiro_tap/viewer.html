@@ -120,6 +120,14 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); heig
   padding: 1px 6px; line-height: 1.4;
 }
 .header .divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+.back-to-dashboard {
+  display: none; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); color: var(--text-secondary); cursor: pointer;
+  transition: all .15s; flex-shrink: 0;
+}
+.back-to-dashboard:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+body.standalone .back-to-dashboard { display: inline-flex; }
 .path-filter { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; flex: 1 1 0; }
 .filter-chip-toggle {
   font-size: 11px; font-family: var(--sans); padding: 4px 10px; border-radius: 20px;
@@ -1425,6 +1433,7 @@ body { font-family: var(--sans); background: var(--bg); color: var(--text); heig
 <body>
 
 <div class="header">
+  <button class="back-to-dashboard" id="back-to-dashboard" type="button" title="Back to Dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
   <div class="logo">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     <span id="logo-text">kiro-tap</span>
@@ -2226,6 +2235,8 @@ function initLang() {
 }
 
 function initCommonUi() {
+  if (window.self === window.top) document.body.classList.add("standalone");
+  document.getElementById("back-to-dashboard").addEventListener("click", () => { window.location.assign("/dashboard"); });
   initTheme();
   initLang();
   initGlobalSearch();
