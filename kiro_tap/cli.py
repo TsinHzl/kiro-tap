@@ -487,7 +487,14 @@ async def async_main(args: argparse.Namespace):
     asyncio_log.propagate = False
 
     # If user specified an upstream proxy, inject it so aiohttp trust_env picks it up.
+    # Normalize: bare port number → http://127.0.0.1:<port>
     if args.upstream_proxy:
+        proxy_val = args.upstream_proxy
+        if proxy_val.isdigit():
+            proxy_val = f"http://127.0.0.1:{proxy_val}"
+        elif "://" not in proxy_val:
+            proxy_val = f"http://{proxy_val}"
+        args.upstream_proxy = proxy_val
         os.environ["HTTPS_PROXY"] = args.upstream_proxy
         os.environ["HTTP_PROXY"] = args.upstream_proxy
         os.environ["ALL_PROXY"] = args.upstream_proxy
