@@ -1,5 +1,3 @@
-> **注：** 本文档由 **claude-sonnet-4-6** 模型自动生成。
-
 # kiro-tap
 
 [![Python version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
