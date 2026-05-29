@@ -397,6 +397,21 @@ def _trust_ca_for_current_user(ca_cert_path: Path) -> int:
     return 0
 
 
+def _print_upstream_proxy_hint(args: argparse.Namespace) -> None:
+    proxy = (
+        args.upstream_proxy
+        or os.environ.get("HTTPS_PROXY")
+        or os.environ.get("https_proxy")
+        or os.environ.get("ALL_PROXY")
+        or os.environ.get("all_proxy")
+    )
+    if proxy:
+        print(f"🌍 Upstream proxy: {proxy}")
+    else:
+        print("💡 No upstream proxy detected. If Kiro requires a VPN/proxy to reach AWS,")
+        print("   run: kiro-tap --proxy http://127.0.0.1:<port>")
+
+
 def _ensure_ca_trust_for_forward_proxy(args: argparse.Namespace, ca_cert_path: Path) -> int:
     """Ensure CA trust when forward-proxy clients need macOS keychain trust."""
     if args.proxy_mode != "forward":
@@ -471,6 +486,15 @@ async def async_main(args: argparse.Namespace):
     asyncio_log.addHandler(sqlite_handler)
     asyncio_log.propagate = False
 
+    # If user specified an upstream proxy, inject it so aiohttp trust_env picks it up.
+    if args.upstream_proxy:
+        os.environ["HTTPS_PROXY"] = args.upstream_proxy
+        os.environ["HTTP_PROXY"] = args.upstream_proxy
+        os.environ["ALL_PROXY"] = args.upstream_proxy
+        os.environ["https_proxy"] = args.upstream_proxy
+        os.environ["http_proxy"] = args.upstream_proxy
+        os.environ["all_proxy"] = args.upstream_proxy
+
     # Honor system proxy env (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY) for
     # outbound upstream requests. This is important when users route traffic
     # through tools like Clash/VPN.
@@ -526,6 +550,7 @@ async def async_main(args: argparse.Namespace):
 
         print(f"📁 Trace session: {session_id}")
         print(f"🗄️  Trace database: {resolve_db_path()}")
+        _print_upstream_proxy_hint(args)
 
         # Background update check
         if not args.no_update_check:
@@ -721,6 +746,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         dest="extra_allowed_paths",
         metavar="PREFIX",
         help="Extra path prefix to allow through the proxy (can be repeated, e.g. --tap-allow-path /custom/api)",
+    )
+    proxy_group.add_argument(
+        "--proxy",
+        default=None,
+        dest="upstream_proxy",
+        metavar="URL",
+        help="Upstream proxy for outbound requests (e.g. http://127.0.0.1:7890 for VPN/Clash)",
     )
 
     # -- Viewer options --
