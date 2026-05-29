@@ -1,0 +1,1738 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>kiro-tap dashboard</title>
+<style>
+:root {
+  --bg: #f4f5f7;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f1f4;
+  --bg-active: #e8ecf4;
+  --bg-code: #f6f8fa;
+  --border: #e2e4e9;
+  --border-light: #edeef1;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  --text: #1c2024;
+  --text-secondary: #60646c;
+  --text-tertiary: #a0a4ab;
+
+  --blue: #3b82f6;
+  --blue-bg: #eff6ff;
+  --green: #10b981;
+  --green-bg: #ecfdf5;
+  --amber: #f59e0b;
+  --amber-bg: #fffbeb;
+  --red: #ef4444;
+  --red-bg: #fef2f2;
+  --purple: #8b5cf6;
+  --purple-bg: #f5f3ff;
+  --cyan: #06b6d4;
+  --cyan-bg: #ecfeff;
+  --orange: #f97316;
+  --orange-bg: #fff7ed;
+  --indigo: #6366f1;
+
+  --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Consolas', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+}
+
+[data-theme="dark"] {
+  --bg: #0d1117;
+  --bg-card: #161b22;
+  --bg-hover: #1c2128;
+  --bg-active: #252c35;
+  --bg-code: #1c2128;
+  --border: #30363d;
+  --border-light: #21262d;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 2px 8px rgba(0,0,0,0.4);
+  --text: #e6edf3;
+  --text-secondary: #8b949e;
+  --text-tertiary: #6e7681;
+  --blue: #58a6ff;
+  --blue-bg: #0d2240;
+  --green: #3fb950;
+  --green-bg: #0d2d1a;
+  --amber: #d29922;
+  --amber-bg: #2d2200;
+  --red: #f85149;
+  --red-bg: #3d1117;
+  --purple: #bc8cff;
+  --purple-bg: #1f1338;
+  --cyan: #39d2c0;
+  --cyan-bg: #0a2e2c;
+  --orange: #f0883e;
+  --orange-bg: #2d1b00;
+  --indigo: #8b8fff;
+}
+
+*,*::before,*::after { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+
+.header {
+  display: flex; align-items: center; gap: 16px;
+  padding: 0 20px; min-height: 52px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0; z-index: 10;
+}
+.header .logo { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.header .logo svg { width: 22px; height: 22px; }
+.header .logo span { font-size: 14px; font-weight: 600; color: var(--text); letter-spacing: -0.3px; }
+.header .divider { width: 1px; height: 24px; background: var(--border); flex-shrink: 0; }
+.path-filter { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; flex: 1 1 0; }
+.filter-chip {
+  font-size: 12px; font-family: var(--mono); padding: 4px 10px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary);
+  transition: all .15s; white-space: nowrap; line-height: 1;
+}
+.filter-chip:hover { border-color: var(--blue); color: var(--blue); }
+.filter-chip.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.filter-chip .chip-count { font-size: 10px; margin-left: 4px; opacity: .68; }
+.stats {
+  margin-left: auto; display: flex; gap: 16px; font-size: 12px; color: var(--text-tertiary); flex-shrink: 0;
+}
+.stats .stat-group { display: flex; align-items: center; gap: 4px; }
+.stats .stat-val { font-weight: 600; color: var(--text-secondary); font-family: var(--mono); }
+.live-status {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 12px;
+  color: var(--green); background: var(--green-bg);
+  font-size: 12px; font-weight: 500;
+}
+.live-status::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+}
+.theme-toggle {
+  background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 8px; color: var(--text-secondary); display: flex; align-items: center;
+  transition: all .15s; font-size: 14px; line-height: 1;
+}
+.theme-toggle:hover { border-color: var(--blue); color: var(--blue); }
+.lang-select {
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 4px 8px; color: var(--text-secondary); transition: all .15s;
+  font-size: 12px; line-height: 1; min-width: 72px;
+}
+.lang-select:hover { border-color: var(--blue); color: var(--blue); }
+
+.trace-path-bar {
+  display: flex; align-items: center; gap: 6px; padding: 4px 12px;
+  background: var(--bg); border-bottom: 1px solid var(--border);
+  font-size: 11px; color: var(--text-tertiary); font-family: var(--mono);
+  flex-shrink: 0;
+}
+.trace-path-bar .tp-label { font-family: var(--sans); font-weight: 500; color: var(--text-secondary); flex-shrink: 0; }
+.trace-path-bar .tp-val { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.trace-path-bar .tp-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+.trace-path-bar .tp-copy {
+  flex-shrink: 0; border: none; background: none;
+  color: var(--text-tertiary); padding: 2px 4px; border-radius: 3px; line-height: 1;
+}
+.trace-path-bar .tp-copy:hover { color: var(--blue); background: var(--blue-bg); }
+
+.main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  background: var(--bg);
+  padding: 14px 20px 20px;
+}
+.main::-webkit-scrollbar { width: 6px; }
+.main::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.list-view,
+.detail-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+body.detail-route .path-filter,
+body.detail-route .header > .divider,
+body.detail-route .trace-path-bar,
+body.detail-route .stats .stat-group {
+  display: none;
+}
+body.detail-route .stats {
+  margin-left: auto;
+}
+body.detail-route .main {
+  padding-top: 10px;
+}
+.dashboard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dashboard-title {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.dashboard-load-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-tertiary);
+  font-size: 12px;
+}
+.dashboard-clock {
+  margin-left: auto;
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .18em;
+  white-space: nowrap;
+}
+.control-panel {
+  display: grid;
+  grid-template-columns: minmax(190px, 260px) minmax(160px, 210px) minmax(260px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.control-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.control-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.history-select,
+.session-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.history-select:hover,
+.session-search input:hover,
+.session-search input:focus { border-color: var(--blue); }
+.session-search { display: flex; align-items: center; min-width: 0; }
+.history-refresh {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 32px; min-width: 38px; padding: 5px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); color: var(--text-secondary);
+  font-family: var(--mono); font-size: 12px; line-height: 1;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.history-refresh:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-bg); }
+.history-refresh.loading,
+.history-refresh:disabled {
+  cursor: progress;
+  opacity: .68;
+}
+.overview-card {
+  display: grid;
+  grid-template-columns: repeat(4, max-content);
+  gap: 34px;
+  align-items: start;
+  min-height: 84px;
+  padding: 20px 22px;
+  margin-bottom: 14px;
+  border: 1px solid #cfd8e7;
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="dark"] .overview-card { border-color: var(--border); }
+.metric-label {
+  color: #5f6b7a;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+[data-theme="dark"] .metric-label { color: var(--text-tertiary); }
+.metric-value {
+  margin-top: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1;
+}
+.table-panel {
+  border: 1px solid #cfd8e7;
+  border-radius: 8px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+[data-theme="dark"] .table-panel { border-color: var(--border); }
+.table-scroll {
+  max-height: min(55vh, 620px);
+  overflow: auto;
+}
+.table-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+.table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.session-table {
+  width: 100%;
+  min-width: 1040px;
+  border-collapse: collapse;
+}
+.session-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 14px 16px;
+  border-bottom: 1px solid #c1ccdc;
+  background: var(--bg-card);
+  color: #515b69;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-align: left;
+  text-transform: uppercase;
+}
+[data-theme="dark"] .session-table th {
+  border-bottom-color: var(--border);
+  color: var(--text-tertiary);
+}
+.session-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid #d8dfeb;
+  color: var(--text);
+  font-size: 13px;
+  vertical-align: middle;
+}
+[data-theme="dark"] .session-table td { border-bottom-color: var(--border-light); }
+.session-table tr:last-child td { border-bottom: 0; }
+.session-row {
+  cursor: pointer;
+  transition: background .12s;
+}
+.session-row:hover { background: var(--bg-hover); }
+.session-row.active { background: var(--blue-bg); }
+.session-row.active td:first-child { box-shadow: inset 3px 0 0 var(--blue); }
+.mono-cell {
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  white-space: nowrap;
+}
+.first-message {
+  max-width: 460px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.trace-count {
+  color: var(--text-secondary);
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.token-pill,
+.model-pill,
+.agent-pill,
+.status-pill,
+.live-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.token-pill {
+  color: #c45a11;
+  background: #fff8ea;
+  border: 1px solid #ffd99b;
+}
+.model-pill {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #6d3dff;
+  background: #f4f0ff;
+  border: 1px solid #d8caff;
+}
+.agent-pill {
+  color: var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid color-mix(in srgb, var(--blue) 28%, transparent);
+}
+.status-pill.ok,
+.status-pill.live {
+  color: #18a449;
+  background: #eafbf1;
+  border: 1px solid #9ee6b4;
+}
+.status-pill.err {
+  color: #ef3350;
+  background: #fff0f3;
+  border: 1px solid #ffb5c1;
+}
+.status-pill.empty-status {
+  color: #c57a00;
+  background: #fff8e7;
+  border: 1px solid #ffdca3;
+}
+[data-theme="dark"] .token-pill { color: var(--orange); background: var(--orange-bg); border-color: #6f3b0c; }
+[data-theme="dark"] .model-pill { color: var(--purple); background: var(--purple-bg); border-color: #4a2d83; }
+[data-theme="dark"] .status-pill.ok,
+[data-theme="dark"] .status-pill.live { color: var(--green); background: var(--green-bg); border-color: #1e6a37; }
+[data-theme="dark"] .status-pill.err { color: var(--red); background: var(--red-bg); border-color: #7a2730; }
+[data-theme="dark"] .status-pill.empty-status { color: var(--amber); background: var(--amber-bg); border-color: #6f5200; }
+.row-action {
+  min-height: 26px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-card);
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.row-action:hover {
+  border-color: var(--blue);
+  background: var(--blue-bg);
+}
+.row-action:disabled {
+  cursor: progress;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
+.table-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+.loading-cell {
+  padding: 34px 16px;
+  color: var(--text-tertiary);
+}
+.loading-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.detail-page-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+body.detail-route .detail-page-head {
+  margin-bottom: 8px;
+}
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1;
+  transition: background .15s, border-color .15s;
+}
+.back-btn:hover {
+  border-color: var(--blue);
+  background: var(--blue-bg);
+}
+.detail-heading {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.detail-title {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+.detail-subtitle {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.detail {
+  flex: none;
+  overflow: visible;
+  padding: 0;
+  background: var(--bg);
+}
+.viewer-frame-wrap {
+  position: relative;
+  height: calc(100vh - 148px);
+  min-height: 640px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+.viewer-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: var(--bg-card);
+}
+.viewer-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  background: var(--bg-card);
+}
+.detail-fallback-note {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  font-size: 12px;
+}
+.detail-load-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+.load-more-btn {
+  min-height: 32px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--blue);
+  font-family: var(--mono);
+  font-size: 12px;
+  transition: background .15s, border-color .15s;
+}
+.load-more-btn:hover {
+  border-color: var(--blue);
+  background: var(--blue-bg);
+}
+.load-more-btn:disabled {
+  cursor: progress;
+  color: var(--text-tertiary);
+  background: var(--bg-hover);
+}
+.detail::-webkit-scrollbar { width: 6px; }
+.detail::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.empty {
+  display: grid; place-items: center; min-height: 360px;
+  color: var(--text-tertiary); font-size: 13px;
+}
+.detail-loading {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+}
+.detail-inspector-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin: 0 0 10px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.07);
+}
+body.detail-route .detail-inspector-bar {
+  margin-bottom: 8px;
+}
+[data-theme="dark"] .detail-inspector-bar {
+  background: rgba(22, 27, 34, 0.9);
+  border-color: #3a4048;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+}
+.detail-tabs { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; min-width: 0; }
+.detail-tab {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 30px; padding: 5px 10px;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent; color: var(--text-secondary);
+  font-family: var(--mono); font-size: 11px; line-height: 1;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.detail-tab:hover { color: var(--blue); border-color: var(--border); background: var(--bg-hover); }
+.detail-tab.active {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 45%, transparent);
+  background: var(--blue-bg);
+}
+.action-bar {
+  display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-left: auto;
+}
+.act-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 4px 8px; border-radius: 6px;
+  border: none; background: transparent;
+  color: var(--text-secondary); font-family: var(--sans);
+  transition: all .15s;
+}
+.act-btn:hover { background: var(--bg-hover); color: var(--blue); }
+.badge {
+  display: inline-flex; align-items: center;
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  background: var(--bg); color: var(--text-tertiary); font-weight: 500;
+  white-space: nowrap;
+}
+.badge.active { background: var(--green-bg); color: var(--green); }
+.badge.error { background: var(--red-bg); color: var(--red); }
+.badge.empty { background: var(--amber-bg); color: var(--amber); }
+.records { display: grid; gap: 8px; }
+.section {
+  margin-bottom: 0; border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  background: var(--bg-card); box-shadow: var(--shadow-sm);
+}
+.section-header {
+  display: flex; align-items: center; padding: 8px 12px;
+  gap: 8px; transition: background .1s;
+}
+.section-header .chevron { font-size: 10px; color: var(--text-tertiary); width: 12px; }
+.section-header .title { font-size: 13px; font-weight: 600; color: var(--text); }
+.section-header .path {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text-tertiary); font-family: var(--mono); font-size: 11px;
+}
+.section-header .copy-btn,
+.section-header .json-btn {
+  font-size: 11px; padding: 3px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-tertiary); margin-left: auto; transition: all .15s;
+}
+.section-header .json-btn:hover { color: var(--blue); border-color: var(--blue); }
+.section-body { padding: 0 16px 16px; overflow-x: auto; }
+.conversation { display: grid; gap: 8px; }
+.msg {
+  margin-bottom: 0; border-radius: var(--radius-sm);
+  padding: 12px 16px; font-size: 13px; line-height: 1.6;
+  border: 1px solid var(--border-light);
+}
+.msg.user { background: var(--blue-bg); border-color: #c7d2fe; }
+.msg.assistant { background: var(--green-bg); border-color: #a7f3d0; }
+[data-theme="dark"] .msg.user { border-color: #1f3a5f; }
+[data-theme="dark"] .msg.assistant { border-color: #1a3a26; }
+.msg-role {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
+}
+.msg.user .msg-role { background: var(--blue); color: #fff; }
+.msg.assistant .msg-role { background: var(--green); color: #fff; }
+.content-block { margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
+.content-block:first-child { margin-top: 0; }
+.json-view {
+  display: none;
+  margin-top: 10px;
+  font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word;
+  max-height: 600px; overflow-y: auto; line-height: 1.55;
+  background: var(--bg-code); color: var(--text);
+  padding: 14px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+}
+.json-view.open { display: block; }
+pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.hidden { display: none !important; }
+
+@media (max-width: 900px) {
+  body { overflow: auto; height: auto; min-height: 100vh; }
+  .header { flex-wrap: wrap; padding: 10px 12px; }
+  .stats { order: 4; width: 100%; flex-wrap: wrap; margin-left: 0; }
+  .trace-path-bar { display: none; }
+  .main { overflow: visible; padding: 12px; }
+  .dashboard-title-row { flex-wrap: wrap; }
+  .dashboard-clock { width: 100%; margin-left: 0; }
+  .control-panel { grid-template-columns: 1fr; }
+  .overview-card { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .table-scroll { max-height: none; }
+  .detail-page-head { align-items: flex-start; }
+  .viewer-frame-wrap { height: 78vh; min-height: 520px; }
+}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    <span>kiro-tap</span>
+  </div>
+  <div class="divider"></div>
+  <div class="path-filter" id="agent-list"></div>
+  <div class="stats">
+    <div class="stat-group"><span data-i18n="stats_sessions">Sessions</span> <span class="stat-val" id="stat-sessions">0</span></div>
+    <div class="stat-group"><span data-i18n="stats_records">Records</span> <span class="stat-val" id="stat-records">0</span></div>
+    <div class="live-status"><span id="live-label">Watching</span></div>
+  </div>
+  <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode" data-i18n-title="theme_toggle">&#9790;</button>
+  <select class="lang-select" id="lang-select" title="Language" data-i18n-title="language">
+    <option value="en">English</option>
+    <option value="zh-CN">简体中文</option>
+  </select>
+</div>
+
+<div class="trace-path-bar" id="trace-path-bar">
+  <span class="tp-label">Dashboard</span>
+  <span class="tp-val">trace history sessions</span>
+</div>
+
+<div class="main">
+  <section id="list-view" class="list-view">
+    <div class="dashboard-title-row">
+      <h1 class="dashboard-title" data-i18n="dashboard_title">Conversation Log</h1>
+      <span class="dashboard-load-status" id="dashboard-load-status" hidden></span>
+      <span class="dashboard-clock" id="dashboard-clock"></span>
+    </div>
+
+    <div class="control-panel">
+      <label class="control-field">
+        <span class="control-label" data-i18n="filter_date">Date</span>
+        <select id="date-filter" class="history-select"></select>
+      </label>
+      <label class="control-field">
+        <span class="control-label" data-i18n="filter_status">Status</span>
+        <select id="status-filter" class="history-select">
+          <option value="all">All status</option>
+          <option value="active">Active</option>
+          <option value="complete">Complete</option>
+          <option value="error">Error</option>
+          <option value="empty">Empty</option>
+        </select>
+      </label>
+      <div class="session-search" role="search">
+        <input id="search" type="search" placeholder="Search messages, agents, models, paths..." data-i18n-placeholder="search_placeholder">
+      </div>
+      <button id="refresh" class="history-refresh" title="Refresh" data-i18n-title="refresh">R</button>
+    </div>
+
+    <section class="overview-card" aria-label="Dashboard summary">
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_threads">Threads</div>
+        <div class="metric-value" id="overview-threads">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_traces">Traces</div>
+        <div class="metric-value" id="overview-traces">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_error_rate">Error Rate</div>
+        <div class="metric-value" id="overview-error-rate">0.0%</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_total_tokens">Total Tokens</div>
+        <div class="metric-value" id="overview-tokens">0</div>
+      </div>
+    </section>
+
+    <section class="table-panel" aria-label="Trace sessions">
+      <div class="table-scroll">
+        <table class="session-table">
+          <thead>
+            <tr>
+              <th data-i18n="table_start_time">Start Time</th>
+              <th data-i18n="table_first_message">First Message</th>
+              <th data-i18n="table_traces">Traces</th>
+              <th data-i18n="table_tokens">Tokens</th>
+              <th data-i18n="table_model">Model</th>
+              <th data-i18n="table_agent">Agent</th>
+              <th data-i18n="table_status">Status</th>
+              <th data-i18n="table_detail">Detail</th>
+            </tr>
+          </thead>
+          <tbody id="session-list"></tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+
+  <section id="detail-view" class="detail-view hidden">
+    <div class="detail-page-head">
+      <button id="back-to-list" class="back-btn" type="button" data-i18n="back_to_sessions">Back to sessions</button>
+      <div class="detail-heading">
+        <div class="detail-title" id="detail-title" data-i18n="session_detail">Session detail</div>
+        <div class="detail-subtitle" id="detail-subtitle" data-i18n="no_session_selected">No session selected.</div>
+      </div>
+    </div>
+    <section id="detail" class="detail">
+      <div class="empty" data-i18n="select_session">Select a session to view details.</div>
+    </section>
+  </section>
+</div>
+
+<script>
+const SESSION_DETAIL_ROUTE = /^\/dashboard\/session\/([^/]+)\/?$/;
+
+const state = {
+  sessions: [],
+  selectedAgent: "all",
+  selectedSessionId: null,
+  pendingSessionId: initialSessionId(),
+  view: "list",
+  activeTab: "conversation",
+  search: "",
+  date: "all",
+  status: "all",
+  loadingSessions: false,
+  loadingSessionId: null,
+  sessionRequestId: 0,
+  detailSessionId: null,
+  detailRecordsLoaded: 0,
+  detailRecordTotal: 0,
+  detailFingerprint: "",
+  detailSession: null,
+};
+
+const $ = selector => document.querySelector(selector);
+const MAX_INLINE_DETAIL_RECORDS = 10;
+
+function initialSessionId() {
+  const routeMatch = window.location.pathname.match(SESSION_DETAIL_ROUTE);
+  if (routeMatch) return decodeURIComponent(routeMatch[1]);
+  return new URLSearchParams(window.location.search).get("session_id") || null;
+}
+
+function sessionDetailUrl(sessionId) {
+  return `/dashboard/session/${encodeURIComponent(sessionId)}`;
+}
+
+function dashboardListUrl() {
+  return "/dashboard";
+}
+
+const DASHBOARD_I18N = {
+  en: {
+    document_title: "kiro-tap dashboard",
+    stats_sessions: "Sessions",
+    stats_records: "Records",
+    live_watching: "Watching",
+    live_polling: "Polling",
+    live_reconnecting: "Reconnecting",
+    theme_toggle: "Toggle dark mode",
+    language: "Language",
+    dashboard: "Dashboard",
+    trace_history_sessions: "trace history sessions",
+    dashboard_title: "Conversation Log",
+    filter_date: "Date",
+    filter_status: "Status",
+    status_all: "All status",
+    status_active: "Active",
+    status_complete: "Complete",
+    status_error: "Error",
+    status_empty: "Empty",
+    status_empty_short: "EMPTY",
+    search_placeholder: "Search messages, agents, models, paths...",
+    refresh: "Refresh",
+    metric_threads: "Threads",
+    metric_traces: "Traces",
+    metric_error_rate: "Error Rate",
+    metric_total_tokens: "Total Tokens",
+    table_start_time: "Start Time",
+    table_first_message: "First Message",
+    table_traces: "Traces",
+    table_tokens: "Tokens",
+    table_model: "Model",
+    table_agent: "Agent",
+    table_status: "Status",
+    table_detail: "Detail",
+    all_dates: "All dates",
+    all_agents: "All agents",
+    no_matching_sessions: "No matching trace sessions.",
+    loading_sessions: "Loading sessions...",
+    loading_session: "Loading session detail...",
+    loading_viewer: "Loading viewer...",
+    loading_more_records: "Loading more records...",
+    load_more_records: "Load more records",
+    limited_records: "Showing {shown} of {total} records.",
+    no_user_prompt: "No captured user prompt.",
+    unknown: "unknown",
+    view_details: "View session details",
+    details: "Details",
+    back_to_sessions: "Back to sessions",
+    session_detail: "Session detail",
+    session_details: "{agent} details",
+    no_session_selected: "No session selected.",
+    select_session: "Select a session to view details.",
+    jsonl: "JSONL",
+    log: "Log",
+    session_id: "Session",
+    export_jsonl: "Export JSONL",
+    export_log: "Export Log",
+    copy_session_id: "Copy session id",
+    unable_load_session: "Unable to load session: {error}",
+    unable_load_dashboard: "Unable to load dashboard: {error}",
+    fallback_viewer: "Showing captured records from SQLite.",
+    copy_path: "Copy session id",
+    records: "Records",
+    turns: "Turns",
+    input: "Input",
+    output: "Output",
+    cache_read: "Cache R",
+    cache_write: "Cache W",
+    total: "Total",
+    tab_default: "Default",
+    tab_trace: "Trace",
+    request_empty: "Request body has no user-facing message.",
+    response_empty: "Response body has no assistant text.",
+    request: "Request",
+    response: "Response",
+    json: "JSON",
+    ok: "ok",
+    empty_session: "This session has no captured API records yet."
+  },
+  "zh-CN": {
+    document_title: "kiro-tap 会话面板",
+    stats_sessions: "会话",
+    stats_records: "记录",
+    live_watching: "监听中",
+    live_polling: "轮询中",
+    live_reconnecting: "重连中",
+    theme_toggle: "切换深色模式",
+    language: "语言",
+    dashboard: "面板",
+    trace_history_sessions: "trace 历史会话",
+    dashboard_title: "对话日志",
+    filter_date: "日期",
+    filter_status: "状态",
+    status_all: "全部状态",
+    status_active: "进行中",
+    status_complete: "已完成",
+    status_error: "错误",
+    status_empty: "空会话",
+    status_empty_short: "空",
+    search_placeholder: "搜索消息、Agent、模型、路径...",
+    refresh: "刷新",
+    metric_threads: "会话数",
+    metric_traces: "Trace 数",
+    metric_error_rate: "错误率",
+    metric_total_tokens: "总 Token",
+    table_start_time: "开始时间",
+    table_first_message: "首条用户 Prompt",
+    table_traces: "Trace",
+    table_tokens: "Token",
+    table_model: "模型",
+    table_agent: "Agent",
+    table_status: "状态",
+    table_detail: "详情",
+    all_dates: "全部日期",
+    all_agents: "全部 Agent",
+    no_matching_sessions: "没有匹配的 trace 会话。",
+    loading_sessions: "正在加载会话...",
+    loading_session: "正在加载会话详情...",
+    loading_viewer: "正在加载 viewer...",
+    loading_more_records: "正在加载更多记录...",
+    load_more_records: "加载更多记录",
+    limited_records: "正在展示 {shown} / {total} 条记录。",
+    no_user_prompt: "未捕获到用户 prompt。",
+    unknown: "未知",
+    view_details: "查看会话详情",
+    details: "详情",
+    back_to_sessions: "返回会话列表",
+    session_detail: "会话详情",
+    session_details: "{agent} 详情",
+    no_session_selected: "未选择会话。",
+    select_session: "选择一个会话查看详情。",
+    jsonl: "JSONL",
+    log: "日志",
+    session_id: "会话",
+    export_jsonl: "导出 JSONL",
+    export_log: "导出日志",
+    copy_session_id: "复制会话 ID",
+    unable_load_session: "无法加载会话：{error}",
+    unable_load_dashboard: "无法加载面板：{error}",
+    fallback_viewer: "正在展示 SQLite 中已捕获的记录。",
+    copy_path: "复制会话 ID",
+    records: "记录",
+    turns: "轮次",
+    input: "输入",
+    output: "输出",
+    cache_read: "缓存读",
+    cache_write: "缓存写",
+    total: "总计",
+    tab_default: "默认",
+    tab_trace: "Trace",
+    request_empty: "请求体里没有面向用户的消息。",
+    response_empty: "响应体里没有 assistant 文本。",
+    request: "请求",
+    response: "响应",
+    json: "JSON",
+    ok: "正常",
+    empty_session: "这个会话还没有捕获到 API 记录。"
+  }
+};
+
+let currentLang = localStorage.getItem("kiro-tap-lang") || detectLang();
+
+function detectLang() {
+  const nav = navigator.language || navigator.userLanguage || "en";
+  return nav.toLowerCase().startsWith("zh") ? "zh-CN" : "en";
+}
+
+function t(key, params = {}) {
+  const template = (DASHBOARD_I18N[currentLang] || DASHBOARD_I18N.en)[key] || DASHBOARD_I18N.en[key] || key;
+  return Object.entries(params).reduce((text, [name, value]) => {
+    return text.replaceAll(`{${name}}`, String(value ?? ""));
+  }, template);
+}
+
+function applyI18n() {
+  document.documentElement.lang = currentLang;
+  document.documentElement.dir = currentLang === "ar" ? "rtl" : "ltr";
+  document.title = t("document_title");
+  $("#lang-select").value = currentLang;
+  document.querySelectorAll("[data-i18n]").forEach(element => {
+    element.textContent = t(element.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach(element => {
+    element.setAttribute("title", t(element.dataset.i18nTitle));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(element => {
+    element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));
+  });
+  $("#live-label").textContent = t("live_watching");
+  renderStatusOptions();
+  updateTracePathBar(state.view === "detail" ? state.detailSession : null);
+}
+
+function setLang(lang) {
+  currentLang = DASHBOARD_I18N[lang] ? lang : "en";
+  localStorage.setItem("kiro-tap-lang", currentLang);
+  applyI18n();
+  renderFilters();
+  renderAgents();
+  renderSessions();
+  if (state.view === "detail" && state.detailSession) {
+    updateDetailI18n(state.detailSession);
+  }
+}
+
+function fmtNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function fmtTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
+function fmtTableTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const pad = number => String(number).padStart(2, "0");
+  return [
+    date.getFullYear(),
+    pad(date.getMonth() + 1),
+    pad(date.getDate()),
+  ].join("-") + " " + [
+    pad(date.getHours()),
+    pad(date.getMinutes()),
+    pad(date.getSeconds()),
+  ].join(":");
+}
+
+function updateClock() {
+  const clock = $("#dashboard-clock");
+  if (clock) clock.textContent = fmtTableTime(new Date().toISOString());
+}
+
+function esc(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function loadingMarkup(label) {
+  return `<span class="loading-state"><span class="spinner" aria-hidden="true"></span><span>${esc(label)}</span></span>`;
+}
+
+function setDashboardLoading(loading, label = t("loading_sessions")) {
+  state.loadingSessions = loading;
+  const status = $("#dashboard-load-status");
+  if (status) {
+    status.hidden = !loading;
+    status.innerHTML = loading ? loadingMarkup(label) : "";
+  }
+  const refresh = $("#refresh");
+  if (refresh) {
+    refresh.disabled = loading;
+    refresh.classList.toggle("loading", loading);
+    refresh.setAttribute("aria-busy", loading ? "true" : "false");
+  }
+}
+
+async function fetchJSON(url) {
+  const response = await fetch(url, {cache: "no-store"});
+  if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  return await response.json();
+}
+
+function filteredSessions() {
+  const needle = state.search.trim().toLowerCase();
+  return state.sessions.filter(session => {
+    if (state.selectedAgent !== "all" && session.agent_key !== state.selectedAgent) return false;
+    if (state.date !== "all" && session.date !== state.date) return false;
+    if (state.status !== "all" && session.status !== state.status) return false;
+    if (!needle) return true;
+    const haystack = [
+      session.agent,
+      session.model,
+      session.first_user,
+      session.last_response,
+      session.legacy_rel_path,
+      session.id,
+      session.status,
+    ].join(" ").toLowerCase();
+    return haystack.includes(needle);
+  });
+}
+
+function renderStatusOptions() {
+  const statusFilter = $("#status-filter");
+  const current = state.status;
+  const options = [
+    ["all", t("status_all")],
+    ["active", t("status_active")],
+    ["complete", t("status_complete")],
+    ["error", t("status_error")],
+    ["empty", t("status_empty")],
+  ];
+  statusFilter.innerHTML = options
+    .map(([value, label]) => `<option value="${esc(value)}">${esc(label)}</option>`)
+    .join("");
+  statusFilter.value = current;
+}
+
+function updateTracePathBar(session = null) {
+  if (state.view === "detail" && session) {
+    $("#trace-path-bar").innerHTML = `
+      <span class="tp-label">${esc(t("session_id"))}</span>
+      <span class="tp-val">${esc(session.id || "")}</span>
+      ${session.legacy_rel_path ? `<span class="tp-sep"></span><span class="tp-label">${esc(t("jsonl"))}</span><span class="tp-val">${esc(session.legacy_rel_path)}</span>` : ""}
+    `;
+    return;
+  }
+  $("#trace-path-bar").innerHTML = `
+    <span class="tp-label">${esc(t("dashboard"))}</span>
+    <span class="tp-val">${esc(t("trace_history_sessions"))}</span>
+  `;
+}
+
+async function refreshSessions({preserveSelection = true, refreshDetail = false} = {}) {
+  const requestId = state.sessionRequestId + 1;
+  state.sessionRequestId = requestId;
+  setDashboardLoading(true);
+  if (!state.sessions.length) {
+    renderSessions();
+  }
+  try {
+    const payload = await fetchJSON("/api/sessions");
+    if (requestId !== state.sessionRequestId) return;
+    state.sessions = payload.sessions || [];
+    renderFilters();
+    renderAgents();
+
+    const visible = filteredSessions();
+    const pendingSessionId = state.pendingSessionId;
+    if (pendingSessionId && visible.some(session => session.id === pendingSessionId)) {
+      state.pendingSessionId = null;
+      state.selectedSessionId = pendingSessionId;
+      state.view = "detail";
+    } else {
+      if (pendingSessionId) state.pendingSessionId = null;
+      const stillVisible = visible.some(session => session.id === state.selectedSessionId);
+      if (!preserveSelection || !stillVisible) {
+        state.selectedSessionId = null;
+        state.view = "list";
+      }
+    }
+    if (state.view !== "detail") {
+      state.selectedSessionId = null;
+      state.view = "list";
+    }
+    renderSessions();
+    if (state.view === "detail" && state.selectedSessionId) {
+      showDetailView();
+      const selected = state.sessions.find(session => session.id === state.selectedSessionId);
+      if (!selected || !state.detailSessionId || refreshDetail) {
+        if (!state.detailSessionId) showDetailLoading(state.selectedSessionId);
+        await loadSession(state.selectedSessionId, {preserveLoaded: true});
+      } else {
+        updateDetailSessionSummary(selected);
+      }
+    } else {
+      showListView();
+    }
+  } finally {
+    if (requestId === state.sessionRequestId) {
+      setDashboardLoading(false);
+      renderSessions();
+    }
+  }
+}
+
+function renderFilters() {
+  const dates = Array.from(new Set(state.sessions.map(session => session.date))).sort().reverse();
+  const dateFilter = $("#date-filter");
+  const current = state.date;
+  dateFilter.innerHTML = `<option value="all">${esc(t("all_dates"))}</option>` + dates
+    .map(date => `<option value="${esc(date)}">${esc(date)}</option>`)
+    .join("");
+  state.date = dates.includes(current) ? current : "all";
+  dateFilter.value = state.date;
+  renderStatusOptions();
+
+  const totalRecords = state.sessions.reduce((sum, session) => sum + session.record_count, 0);
+  $("#stat-sessions").textContent = fmtNumber(state.sessions.length);
+  $("#stat-records").textContent = fmtNumber(totalRecords);
+}
+
+function renderAgents() {
+  const buckets = new Map();
+  for (const session of state.sessions) {
+    const bucket = buckets.get(session.agent_key) || {key: session.agent_key, label: session.agent, sessions: 0};
+    bucket.sessions += 1;
+    buckets.set(session.agent_key, bucket);
+  }
+  const agents = [{key: "all", label: t("all_agents"), sessions: state.sessions.length}]
+    .concat(Array.from(buckets.values()).sort((a, b) => a.label.localeCompare(b.label)));
+  $("#agent-list").innerHTML = agents.map(agent => `
+    <button class="filter-chip ${state.selectedAgent === agent.key ? "active" : ""}" data-agent="${esc(agent.key)}">
+      <span>${esc(agent.label)}</span>
+      <span class="chip-count">${fmtNumber(agent.sessions)}</span>
+    </button>
+  `).join("");
+  document.querySelectorAll("[data-agent]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.selectedAgent = button.dataset.agent;
+      state.selectedSessionId = null;
+      state.view = "list";
+      renderAgents();
+      renderSessions();
+      showListView();
+    });
+  });
+}
+
+function renderSessions() {
+  const sessions = filteredSessions();
+  renderOverview(sessions);
+  if (state.loadingSessions && !state.sessions.length) {
+    $("#session-list").innerHTML = `<tr><td class="loading-cell" colspan="8">${loadingMarkup(t("loading_sessions"))}</td></tr>`;
+    return;
+  }
+  if (!sessions.length) {
+    $("#session-list").innerHTML = `<tr><td class="table-empty" colspan="8">${esc(t("no_matching_sessions"))}</td></tr>`;
+    return;
+  }
+
+  $("#session-list").innerHTML = sessions.map(session => sessionRow(session)).join("");
+  document.querySelectorAll("[data-session]").forEach(row => {
+    row.addEventListener("click", event => {
+      event.preventDefault();
+      openSession(row.dataset.session);
+    });
+    row.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        openSession(row.dataset.session);
+      }
+    });
+  });
+}
+
+function sessionRow(session) {
+  const preview = session.first_user || "";
+  const firstMessage = preview || t("no_user_prompt");
+  const status = statusInfo(session);
+  const isLoading = state.loadingSessionId === session.id;
+  return `
+    <tr class="session-row ${state.selectedSessionId === session.id ? "active" : ""}" data-session="${esc(session.id)}" tabindex="0">
+      <td class="mono-cell">${esc(fmtTableTime(session.started_at || session.updated_at))}</td>
+      <td><div class="first-message" title="${esc(firstMessage)}">${esc(firstMessage)}</div></td>
+      <td><span class="trace-count">${fmtNumber(session.record_count)}</span></td>
+      <td><span class="token-pill">${fmtNumber(session.total_tokens)}</span></td>
+      <td><span class="model-pill" title="${esc(session.model || t("unknown"))}">${esc(session.model || t("unknown"))}</span></td>
+      <td><span class="agent-pill">${esc(session.agent || t("unknown"))}</span></td>
+      <td><span class="status-pill ${status.className}">${esc(status.label)}</span></td>
+      <td><button class="row-action" type="button" aria-label="${esc(t("view_details"))}" ${isLoading ? "disabled" : ""}>${esc(isLoading ? t("loading_session") : t("details"))}</button></td>
+    </tr>
+  `;
+}
+
+function renderOverview(sessions) {
+  const traces = sessions.reduce((sum, session) => sum + session.record_count, 0);
+  const tokens = sessions.reduce((sum, session) => sum + session.total_tokens, 0);
+  const errors = sessions.filter(session => session.status === "error").length;
+  const errorRate = sessions.length ? `${((errors / sessions.length) * 100).toFixed(1)}%` : "0.0%";
+  $("#overview-threads").textContent = fmtNumber(sessions.length);
+  $("#overview-traces").textContent = fmtNumber(traces);
+  $("#overview-error-rate").textContent = errorRate;
+  $("#overview-tokens").textContent = fmtNumber(tokens);
+}
+
+function statusInfo(session) {
+  if (session.status === "error") return {label: "ERR", className: "err"};
+  if (session.status === "empty") return {label: t("status_empty_short"), className: "empty-status"};
+  if (session.live || session.status === "active") return {label: "LIVE", className: "live"};
+  return {label: "OK", className: "ok"};
+}
+
+function openSession(sessionId) {
+  window.location.assign(sessionDetailUrl(sessionId));
+}
+
+function showListView() {
+  state.view = "list";
+  state.detailSessionId = null;
+  state.detailRecordsLoaded = 0;
+  state.detailRecordTotal = 0;
+  state.detailFingerprint = "";
+  state.detailSession = null;
+  document.body.classList.remove("detail-route");
+  $("#list-view").classList.remove("hidden");
+  $("#detail-view").classList.add("hidden");
+  updateTracePathBar();
+}
+
+function showDetailView() {
+  document.body.classList.add("detail-route");
+  $("#list-view").classList.add("hidden");
+  $("#detail-view").classList.remove("hidden");
+}
+
+function showDetailLoading(sessionId) {
+  const session = state.sessions.find(item => item.id === sessionId);
+  $("#detail-title").textContent = session ? t("session_details", {agent: session.agent || t("session_detail")}) : t("session_detail");
+  $("#detail-subtitle").textContent = session?.legacy_rel_path || session?.id || "";
+  if (session) updateTracePathBar(session);
+  $("#detail").innerHTML = `<div class="detail-loading">${loadingMarkup(t("loading_session"))}</div>`;
+}
+
+function sessionRecordCount(session) {
+  const count = Number(session?.record_count || 0);
+  return Number.isFinite(count) && count > 0 ? count : 0;
+}
+
+function sessionDetailFingerprint(session) {
+  return [
+    session.id || "",
+    session.status || "",
+    session.record_count || 0,
+    session.turn_count || 0,
+    session.input_tokens || 0,
+    session.output_tokens || 0,
+    session.cache_read_tokens || 0,
+    session.cache_create_tokens || 0,
+    session.total_tokens || 0,
+    session.legacy_rel_path || "",
+  ].join("|");
+}
+
+function updateDetailSessionSummary(session) {
+  if (!session || state.detailSessionId !== session.id) return;
+  state.detailSession = {...(state.detailSession || {}), ...session};
+  state.detailFingerprint = sessionDetailFingerprint(session);
+  $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
+  $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
+  updateTracePathBar(session);
+}
+
+function detailRecordFetchLimit(sessionId, preserveLoaded) {
+  const sameSession = preserveLoaded && state.detailSessionId === sessionId;
+  const loadedRecords = sameSession ? state.detailRecordsLoaded : 0;
+  const previousTotal = sameSession ? state.detailRecordTotal : 0;
+  const session = state.sessions.find(item => item.id === sessionId);
+  const knownTotal = sameSession ? sessionRecordCount(session) : 0;
+  let limit = Math.max(MAX_INLINE_DETAIL_RECORDS, loadedRecords || 0);
+  if (knownTotal > previousTotal && previousTotal <= loadedRecords) {
+    limit = Math.max(limit, knownTotal);
+  }
+  return limit;
+}
+
+async function loadSession(sessionId, {preserveLoaded = false} = {}) {
+  state.loadingSessionId = sessionId;
+  const limit = detailRecordFetchLimit(sessionId, preserveLoaded);
+  try {
+    const payload = await fetchJSON(`/api/sessions/${encodeURIComponent(sessionId)}/records?offset=0&limit=${limit}`);
+    if (state.selectedSessionId !== sessionId) return;
+    renderDetail(payload.session, payload.records || []);
+  } catch (error) {
+    if (state.selectedSessionId !== sessionId) return;
+    showDetailView();
+    $("#detail").innerHTML = `<div class="empty">${esc(t("unable_load_session", {error: error.message}))}</div>`;
+  } finally {
+    if (state.loadingSessionId === sessionId) {
+      state.loadingSessionId = null;
+      renderSessions();
+    }
+  }
+}
+
+async function loadMoreSessionRecords(session, records, button) {
+  const sessionId = session.id;
+  const offset = records.length;
+  button.disabled = true;
+  button.textContent = t("loading_more_records");
+  try {
+    const payload = await fetchJSON(
+      `/api/sessions/${encodeURIComponent(sessionId)}/records?offset=${offset}&limit=${MAX_INLINE_DETAIL_RECORDS}`
+    );
+    if (state.selectedSessionId !== sessionId) return;
+    const nextRecords = payload.records || [];
+    renderDetail(payload.session, records.concat(nextRecords));
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = t("load_more_records");
+    console.error(error);
+  }
+}
+
+function renderDetail(session, records) {
+  const totalRecords = Number(session.record_count || records.length);
+  const hasHiddenRecords = totalRecords > records.length;
+  const alternateTab = state.activeTab === "conversation" ? "raw" : "conversation";
+  const alternateLabel = alternateTab === "conversation" ? t("tab_default") : t("tab_trace");
+  state.detailSessionId = session.id;
+  state.detailRecordsLoaded = records.length;
+  state.detailRecordTotal = totalRecords;
+  state.detailFingerprint = sessionDetailFingerprint(session);
+  state.detailSession = session;
+  $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
+  $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
+  updateTracePathBar(session);
+  $("#detail").innerHTML = `
+    <div class="detail-inspector-bar">
+      <div class="detail-tabs">
+        <button class="detail-tab" data-tab="${alternateTab}">${esc(alternateLabel)}</button>
+      </div>
+      <div class="action-bar">
+        <a class="act-btn" data-detail-i18n="export_jsonl" href="/api/sessions/${encodeURIComponent(session.id)}/export/jsonl" download>${esc(t("export_jsonl"))}</a>
+        <a class="act-btn" data-detail-i18n="export_log" href="/api/sessions/${encodeURIComponent(session.id)}/export/log" download>${esc(t("export_log"))}</a>
+        <button class="act-btn" data-detail-i18n="copy_path" data-copy-path="${esc(session.id)}">${esc(t("copy_path"))}</button>
+      </div>
+    </div>
+    <div id="conversation-tab" class="${state.activeTab === "conversation" ? "" : "hidden"}">
+      <div class="viewer-frame-wrap">
+        <div class="viewer-loading" data-viewer-loading>${loadingMarkup(t("loading_viewer"))}</div>
+        <iframe
+          class="viewer-frame"
+          data-viewer-frame
+          src="/api/sessions/${encodeURIComponent(session.id)}/html"
+          title="${esc(t("session_details", {agent: session.agent || t("session_detail")}))}"
+        ></iframe>
+      </div>
+    </div>
+    <div id="raw-tab" class="${state.activeTab === "raw" ? "" : "hidden"}">
+      ${hasHiddenRecords ? `<div class="detail-fallback-note">${esc(t("limited_records", {shown: records.length, total: totalRecords}))}</div>` : ""}
+      <div class="records">${records.map((record, index) => renderRecord(record, index)).join("") || emptyRecord()}</div>
+      ${hasHiddenRecords ? `<div class="detail-load-more"><button class="load-more-btn" type="button" data-load-more>${esc(t("load_more_records"))}</button></div>` : ""}
+    </div>
+  `;
+
+  document.querySelector("[data-viewer-frame]")?.addEventListener("load", event => {
+    event.currentTarget?.parentElement?.querySelector("[data-viewer-loading]")?.remove();
+  });
+
+  document.querySelectorAll("[data-tab]").forEach(button => {
+    button.addEventListener("click", () => {
+      state.activeTab = button.dataset.tab;
+      renderDetail(session, records);
+    });
+  });
+  document.querySelectorAll("[data-json-toggle]").forEach(button => {
+    button.addEventListener("click", () => {
+      const panel = document.getElementById(button.dataset.jsonToggle);
+      const pre = panel?.querySelector("[data-json-index]");
+      if (pre && !pre.dataset.rendered) {
+        const index = Number(pre.dataset.jsonIndex);
+        pre.textContent = JSON.stringify(records[index] || {}, null, 2);
+        pre.dataset.rendered = "true";
+      }
+      panel?.classList.toggle("open");
+    });
+  });
+  document.querySelectorAll("[data-load-more]").forEach(button => {
+    button.addEventListener("click", () => loadMoreSessionRecords(session, records, button));
+  });
+  document.querySelectorAll("[data-copy-path]").forEach(button => {
+    button.addEventListener("click", () => navigator.clipboard?.writeText(button.dataset.copyPath || ""));
+  });
+}
+
+function updateDetailI18n(session) {
+  $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
+  $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
+  updateTracePathBar(session);
+  document.querySelectorAll("[data-tab]").forEach(button => {
+    button.textContent = button.dataset.tab === "conversation" ? t("tab_default") : t("tab_trace");
+  });
+  document.querySelectorAll("[data-detail-i18n]").forEach(element => {
+    element.textContent = t(element.dataset.detailI18n);
+  });
+}
+
+function renderRecord(record, index) {
+  const request = record.request || {};
+  const response = record.response || {};
+  const userText = requestText(request.body) || t("request_empty");
+  const responseText = responseTextFromRecord(record) || response.error || t("response_empty");
+  const status = response.status ?? "";
+  const path = request.path || "";
+  const jsonId = `json-${index}`;
+  const statusClass = Number(status) >= 400 ? "error" : "";
+  return `
+    <article class="section">
+      <div class="section-header">
+        <span class="chevron">&#9654;</span>
+        <span class="title">Turn ${esc(record.turn ?? index + 1)}</span>
+        <span class="badge ${statusClass}">${esc(status || t("ok"))}</span>
+        <span class="path">${esc(path)}</span>
+        <button class="json-btn" data-json-toggle="${jsonId}">${esc(t("json"))}</button>
+      </div>
+      <div class="section-body">
+        <div class="conversation">
+          <div class="msg user">
+            <span class="msg-role">${esc(t("request"))}</span>
+            <div class="content-block">${esc(userText)}</div>
+          </div>
+          <div class="msg assistant">
+            <span class="msg-role">${esc(t("response"))}</span>
+            <div class="content-block">${esc(responseText)}</div>
+          </div>
+        </div>
+        <div id="${jsonId}" class="json-view"><pre data-json-index="${index}"></pre></div>
+      </div>
+    </article>
+  `;
+}
+
+function emptyRecord() {
+  return `<div class="empty">${esc(t("empty_session"))}</div>`;
+}
+
+function requestText(body) {
+  if (typeof body === "string") return body;
+  if (!body || typeof body !== "object") return "";
+  if (Array.isArray(body.messages)) {
+    const message = body.messages.find(item => item && item.role === "user");
+    if (message) return contentText(message.content);
+  }
+  const input = contentText(body.input);
+  if (input) return input;
+  const request = body.request && typeof body.request === "object" ? body.request : body;
+  if (Array.isArray(request.contents)) {
+    const content = request.contents.find(item => item && (!item.role || item.role.toLowerCase() === "user"));
+    if (content) return partsText(content.parts);
+  }
+  return typeof body.prompt === "string" ? body.prompt : "";
+}
+
+function responseTextFromBody(body) {
+  if (typeof body === "string") return body;
+  if (!body || typeof body !== "object") return "";
+  const direct = contentText(body.content);
+  if (direct) return direct;
+  if (Array.isArray(body.candidates)) {
+    return body.candidates.map(candidate => partsText(candidate?.content?.parts)).filter(Boolean).join("\\n");
+  }
+  if (Array.isArray(body.choices)) {
+    return body.choices.map(choice => contentText(choice?.message?.content || choice?.delta?.content)).filter(Boolean).join("\\n");
+  }
+  const output = contentText(body.output);
+  if (output) return output;
+  return contentText(body.response);
+}
+
+function responseTextFromRecord(record) {
+  const response = record.response || {};
+  const bodyText = responseTextFromBody(response.body);
+  if (bodyText) return bodyText;
+  const events = Array.isArray(response.ws_events) ? response.ws_events : Array.isArray(response.sse_events) ? response.sse_events : [];
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i] || {};
+    const payload = event.response && typeof event.response === "object" ? event.response : event.data || event;
+    const text = responseTextFromBody(payload) || contentText(event.item) || contentText(event.part) || event.text || "";
+    if (text) return text;
+  }
+  return "";
+}
+
+function contentText(value) {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) {
+    return value.map(item => {
+      if (typeof item === "string") return item;
+      if (!item || typeof item !== "object") return "";
+      return contentText(item.text || item.content || item.output_text || "");
+    }).filter(Boolean).join("\\n");
+  }
+  if (value && typeof value === "object") {
+    return contentText(value.text || value.content || value.output_text || "");
+  }
+  return "";
+}
+
+function partsText(parts) {
+  if (!Array.isArray(parts)) return "";
+  return parts.map(part => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\\n");
+}
+
+function connectEvents() {
+  if (!window.EventSource) {
+    $("#live-label").textContent = t("live_polling");
+    return;
+  }
+  const events = new EventSource("/dashboard/events");
+  events.addEventListener("open", () => {
+    $("#live-label").textContent = t("live_watching");
+  });
+  events.addEventListener("refresh", () => {
+    refreshSessions({preserveSelection: true}).catch(console.error);
+  });
+  events.addEventListener("record", () => {
+    refreshSessions({preserveSelection: true}).catch(console.error);
+  });
+  events.addEventListener("error", () => {
+    $("#live-label").textContent = t("live_reconnecting");
+  });
+}
+
+function initTheme() {
+  const saved = localStorage.getItem("kiro-tap-theme");
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyTheme(saved || (prefersDark ? "dark" : "light"));
+}
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("kiro-tap-theme", next);
+  applyTheme(next);
+}
+
+function applyTheme(theme) {
+  if (theme === "dark") {
+    document.documentElement.dataset.theme = "dark";
+    $("#theme-toggle").textContent = "\u2600";
+  } else {
+    delete document.documentElement.dataset.theme;
+    $("#theme-toggle").textContent = "\u263E";
+  }
+}
+
+$("#search").addEventListener("input", event => {
+  state.search = event.target.value;
+  state.selectedSessionId = null;
+  state.view = "list";
+  renderSessions();
+  showListView();
+});
+
+$("#date-filter").addEventListener("change", event => {
+  state.date = event.target.value;
+  state.selectedSessionId = null;
+  state.view = "list";
+  renderSessions();
+  showListView();
+});
+
+$("#status-filter").addEventListener("change", event => {
+  state.status = event.target.value;
+  state.selectedSessionId = null;
+  state.view = "list";
+  renderSessions();
+  showListView();
+});
+
+$("#refresh").addEventListener("click", () => refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error));
+$("#back-to-list").addEventListener("click", () => {
+  window.location.assign(dashboardListUrl());
+});
+$("#theme-toggle").addEventListener("click", toggleTheme);
+$("#lang-select").addEventListener("change", event => setLang(event.target.value));
+
+applyI18n();
+initTheme();
+updateClock();
+setInterval(updateClock, 1000);
+connectEvents();
+refreshSessions({preserveSelection: false}).catch(error => {
+  $("#detail").innerHTML = `<div class="empty">${esc(t("unable_load_dashboard", {error: error.message}))}</div>`;
+});
+setInterval(() => refreshSessions({preserveSelection: true}).catch(console.error), 5000);
+</script>
+</body>
+</html>

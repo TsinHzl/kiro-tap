@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.traces/
+*.jsonl
+*.db
+.python-version
+uv.lock
