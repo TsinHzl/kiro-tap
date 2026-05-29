@@ -1,5 +1,6 @@
 # kiro-tap
 
+[![PyPI version](https://img.shields.io/pypi/v/kiro-tap)](https://pypi.org/project/kiro-tap/)
 [![Python version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
@@ -22,6 +23,9 @@
 ```bash
 # 推荐
 uv tool install kiro-tap
+
+# 或使用 pipx
+pipx install kiro-tap
 
 # 或使用 pip
 pip install kiro-tap
