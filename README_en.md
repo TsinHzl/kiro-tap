@@ -129,9 +129,7 @@ The generated HTML viewer (zero external dependencies) supports:
 - **Copy helpers** — one-click copy of request JSON or cURL command
 - **i18n** — English, 简体中文, 日本語, 한국어, Français, العربية, Deutsch, Русский
 
-## Technical Notes
-
-### AWS Event Stream Parsing
+## AWS Event Stream Parsing
 
 The Kiro API uses the AWS Event Stream binary framing protocol (not standard SSE). kiro-tap implements a full frame parser:
 
@@ -139,17 +137,6 @@ The Kiro API uses the AWS Event Stream binary framing protocol (not standard SSE
 - All header value types (bool, byte, short, int, long, bytes, string, timestamp, uuid)
 - Event types: `assistantResponseEvent`, `toolUseEvent`, `meteringEvent`, `contextUsageEvent`, `codeReferenceEvent`
 - Error and exception message types
-
-### Differences from claude-tap
-
-| | claude-tap | kiro-tap |
-|--|-----------|---------|
-| Target client | Claude Code | Kiro CLI / Kiro IDE |
-| Proxy mode | Reverse (default) | Forward (only option) |
-| Response format | SSE | AWS Event Stream binary |
-| CA injection | NODE_EXTRA_CA_CERTS | SSL_CERT_FILE + NODE_EXTRA_CA_CERTS |
-| Dashboard port | 19527 | 19528 |
-| Upstream | api.anthropic.com | q.us-east-1.amazonaws.com |
 
 ## License
 

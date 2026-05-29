@@ -127,9 +127,7 @@ HTTPS_PROXY=http://127.0.0.1:8080 SSL_CERT_FILE=~/.kiro-tap/ca.pem kiro-cli-chat
 - **一键复制**：复制请求 JSON 或 cURL 命令
 - **多语言**：English、简体中文、日本語、한국어、Français、العربية、Deutsch、Русский
 
-## 技术说明
-
-### AWS Event Stream 解析
+## AWS Event Stream 解析
 
 Kiro API 使用 AWS Event Stream 二进制帧协议（非标准 SSE）。kiro-tap 实现了完整的帧解析器：
 
@@ -137,17 +135,6 @@ Kiro API 使用 AWS Event Stream 二进制帧协议（非标准 SSE）。kiro-ta
 - 所有 Header 值类型（bool、byte、short、int、long、bytes、string、timestamp、uuid）
 - 事件类型：`assistantResponseEvent`、`toolUseEvent`、`meteringEvent`、`contextUsageEvent`、`codeReferenceEvent`
 - 错误/异常消息类型
-
-### 与 claude-tap 的差异
-
-| 项目 | claude-tap | kiro-tap |
-|------|-----------|---------|
-| 目标客户端 | Claude Code | Kiro CLI / Kiro IDE |
-| 代理模式 | 反向代理（默认） | 正向代理（唯一选项） |
-| 响应格式 | SSE | AWS Event Stream 二进制 |
-| CA 注入 | NODE_EXTRA_CA_CERTS | SSL_CERT_FILE + NODE_EXTRA_CA_CERTS |
-| Dashboard 端口 | 19527 | 19528 |
-| 上游 | api.anthropic.com | q.us-east-1.amazonaws.com |
 
 ## 许可证
 
