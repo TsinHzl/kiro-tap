@@ -1260,30 +1260,7 @@ function renderFilters() {
 }
 
 function renderAgents() {
-  const buckets = new Map();
-  for (const session of state.sessions) {
-    const bucket = buckets.get(session.agent_key) || {key: session.agent_key, label: session.agent, sessions: 0};
-    bucket.sessions += 1;
-    buckets.set(session.agent_key, bucket);
-  }
-  const agents = [{key: "all", label: t("all_agents"), sessions: state.sessions.length}]
-    .concat(Array.from(buckets.values()).sort((a, b) => a.label.localeCompare(b.label)));
-  $("#agent-list").innerHTML = agents.map(agent => `
-    <button class="filter-chip ${state.selectedAgent === agent.key ? "active" : ""}" data-agent="${esc(agent.key)}">
-      <span>${esc(agent.label)}</span>
-      <span class="chip-count">${fmtNumber(agent.sessions)}</span>
-    </button>
-  `).join("");
-  document.querySelectorAll("[data-agent]").forEach(button => {
-    button.addEventListener("click", () => {
-      state.selectedAgent = button.dataset.agent;
-      state.selectedSessionId = null;
-      state.view = "list";
-      renderAgents();
-      renderSessions();
-      showListView();
-    });
-  });
+  $("#agent-list").innerHTML = "";
 }
 
 function renderSessions() {
