@@ -463,6 +463,7 @@ async def async_main(args: argparse.Namespace):
                 output_dir=output_dir,
                 open_browser=args.open_viewer,
                 open_browser_fn=_open_browser,
+                session_id=session_id,
             )
             if spawned:
                 print(f"🌐 Dashboard: {dashboard_url_value}")

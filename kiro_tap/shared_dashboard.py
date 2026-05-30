@@ -266,13 +266,16 @@ async def ensure_shared_dashboard(
     output_dir: Path,
     open_browser: bool,
     open_browser_fn,
+    session_id: str | None = None,
 ) -> tuple[str, bool]:
     """Ensure the shared dashboard is running; return (url, spawned_by_caller)."""
     url = dashboard_url(host, port)
+    from urllib.parse import quote
+    browser_url = f"{url}?session_id={quote(session_id, safe='')}" if session_id else url
     if await is_dashboard_healthy(host, port) or await is_legacy_dashboard_healthy(host, port):
         _migrate_legacy_traces(output_dir)
         if open_browser:
-            open_browser_fn(url)
+            open_browser_fn(browser_url)
         return url, False
 
     spawned = await asyncio.to_thread(_spawn_dashboard_subprocess_if_needed, host, port, output_dir)
@@ -283,5 +286,5 @@ async def ensure_shared_dashboard(
         _migrate_legacy_traces(output_dir)
 
     if open_browser:
-        open_browser_fn(url)
+        open_browser_fn(browser_url)
     return url, spawned
