@@ -1062,6 +1062,31 @@ def trust_ca_main(argv: list[str] | None = None) -> int:
     return _trust_ca_for_current_user(ca_cert_path)
 
 
+def _kill_stale_kiro_tap_processes() -> None:
+    """Kill any other kiro-tap processes (excluding self and dashboard subprocesses)."""
+    import signal
+
+    current_pid = os.getpid()
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "kiro-tap"],
+            capture_output=True, text=True, timeout=3,
+        )
+        for pid_str in result.stdout.strip().splitlines():
+            try:
+                pid = int(pid_str)
+            except ValueError:
+                continue
+            if pid == current_pid:
+                continue
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
+                pass
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def main_entry() -> None:
     """Entry point for the kiro-tap CLI."""
     if len(sys.argv) > 1 and sys.argv[1] == "export":
@@ -1082,6 +1107,9 @@ def main_entry() -> None:
         except KeyboardInterrupt:
             code = 0
         sys.exit(code)
+
+    # Kill any stale kiro-tap processes before starting
+    _kill_stale_kiro_tap_processes()
 
     args = parse_args()
     try:
