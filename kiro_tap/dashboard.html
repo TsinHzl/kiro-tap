@@ -1767,8 +1767,15 @@ function connectEvents() {
   events.addEventListener("refresh", () => {
     refreshSessions({preserveSelection: true}).catch(console.error);
   });
-  events.addEventListener("record", () => {
-    refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error);
+  events.addEventListener("record", (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      const sessionId = data.session_id;
+      const isCurrentSession = sessionId && state.selectedSessionId === sessionId;
+      refreshSessions({preserveSelection: true, refreshDetail: isCurrentSession}).catch(console.error);
+    } catch {
+      refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error);
+    }
   });
   events.addEventListener("error", () => {
     $("#live-label").textContent = t("live_reconnecting");

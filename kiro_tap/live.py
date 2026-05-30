@@ -401,7 +401,16 @@ class LiveViewerServer:
                 break
             snapshot = dashboard_trace_snapshot()
             if snapshot != self._dashboard_snapshot:
+                # Find sessions that changed or were added
+                changed_ids = [
+                    sid for sid, val in snapshot.items()
+                    if self._dashboard_snapshot.get(sid) != val
+                ]
                 self._dashboard_snapshot = snapshot
+                # Emit a record event for each changed session so the detail page refreshes
+                for sid in changed_ids:
+                    await self._broadcast_dashboard_event({"type": "record", "session_id": sid})
+                # Also emit a refresh so the session list updates
                 await self._broadcast_dashboard_event({"type": "refresh"})
 
     async def _broadcast_dashboard_event(self, payload: dict) -> None:
