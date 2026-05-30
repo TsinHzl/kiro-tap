@@ -1768,7 +1768,7 @@ function connectEvents() {
     refreshSessions({preserveSelection: true}).catch(console.error);
   });
   events.addEventListener("record", () => {
-    refreshSessions({preserveSelection: true}).catch(console.error);
+    refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error);
   });
   events.addEventListener("error", () => {
     $("#live-label").textContent = t("live_reconnecting");
