@@ -2319,6 +2319,7 @@ function renderEmptyTraceState() {
 let liveEventSource = null;
 let liveConnected = false;
 let currentDetailRequestId = null;
+let currentDetailEntrySnapshot = null; // {duration_ms, hasResponse} for live refresh detection
 let liveRecords = [];
 let viewingDate = null; // null = live, string = historical date
 let liveRenderTimer = null;
@@ -3815,7 +3816,16 @@ function selectEntry(idx, opts) {
   }
   // Skip re-render if same entry and force=false (preserves scroll position in live mode)
   if (!force && currentDetailRequestId === filtered[idx].request_id) {
-    // Just update sidebar highlight, keep detail as-is
+    // Re-render if entry data has changed (e.g. response arrived or duration updated)
+    const e = filtered[idx];
+    const snap = { duration_ms: e.duration_ms, hasResponse: !!(e.response?.body || e.response?.status) };
+    if (!currentDetailEntrySnapshot ||
+        snap.duration_ms !== currentDetailEntrySnapshot.duration_ms ||
+        snap.hasResponse !== currentDetailEntrySnapshot.hasResponse) {
+      const resolved = e._isStub ? getFullEntry(e) : e;
+      renderDetail(resolved);
+    }
+    // else: no change, keep detail as-is
   } else {
     const entry = filtered[idx];
     const resolved = entry._isStub ? getFullEntry(entry) : entry;
@@ -3915,6 +3925,7 @@ function renderTraceFormatControls() {
 function renderDetail(e) {
   saveSectionStates();
   currentDetailRequestId = e.request_id;
+  currentDetailEntrySnapshot = { duration_ms: e.duration_ms, hasResponse: !!(e.response?.body || e.response?.status) };
   const d = $('#detail');
   const reqBody = e.request?.body, respBody = e.response?.body, usage = getUsage(e);
   const statusCode = getResponseStatus(e);
