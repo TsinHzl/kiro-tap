@@ -12,6 +12,8 @@ from urllib.parse import quote
 
 from aiohttp import web
 
+from importlib.metadata import version as _pkg_version
+
 from kiro_tap.dashboard import (
     dashboard_trace_snapshot,
     ensure_trace_store,
@@ -183,6 +185,7 @@ class LiveViewerServer:
             html = read_dashboard_template()
         except OSError:
             return web.Response(status=404, text="dashboard.html not found")
+        html = self._inject_version(html)
         return web.Response(text=html, content_type="text/html")
 
     async def _handle_dashboard_session_detail(self, request: web.Request) -> web.Response:
@@ -191,7 +194,15 @@ class LiveViewerServer:
             html = read_dashboard_template()
         except OSError:
             return web.Response(status=404, text="dashboard.html not found")
+        html = self._inject_version(html)
         return web.Response(text=html, content_type="text/html")
+
+    def _inject_version(self, html: str) -> str:
+        try:
+            ver = _pkg_version("kiro-tap")
+        except Exception:
+            ver = "dev"
+        return html.replace('id="app-version">', f'id="app-version">v{ver}', 1)
 
     async def _handle_dashboard_health(self, request: web.Request) -> web.Response:
         return web.json_response({"ok": True, "db_path": str(resolve_db_path())})
