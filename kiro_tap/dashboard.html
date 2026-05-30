@@ -1771,7 +1771,8 @@ function connectEvents() {
     try {
       const data = JSON.parse(e.data);
       const sessionId = data.session_id;
-      const isCurrentSession = sessionId && state.selectedSessionId === sessionId;
+      const urlSessionId = initialSessionId();
+      const isCurrentSession = sessionId && (state.selectedSessionId === sessionId || urlSessionId === sessionId);
       refreshSessions({preserveSelection: true, refreshDetail: isCurrentSession}).catch(console.error);
     } catch {
       refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error);
