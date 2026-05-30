@@ -33,7 +33,7 @@ pipx install kiro-tap
 pip install kiro-tap
 ```
 
-Upgrade: `kiro-tap update`, `uv tool upgrade kiro-tap`, or `pip install --upgrade kiro-tap`
+Upgrade: `kiro-tap update`, `uv tool upgrade kiro-tap`, `pipx upgrade kiro-tap`, or `pip install --upgrade kiro-tap`
 
 ## Quick Start
 
