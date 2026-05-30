@@ -4477,10 +4477,11 @@ function renderViewerTelemetrySection(entry) {
 
 function extractContextFilePath(ctx) {
   const patterns = [
-    /^File:\s*(.+)/m,
-    /path=["']([^"']+)["']/,
-    /^#\s*(\/\S+)/m,
-    /^((?:\/|\.\/|\.\.\/)[\w./\-]+\.\w+)/m,
+    /^\[([^\]]+)\]/m,           // [/path/to/file] — Kiro CLI format
+    /^File:\s*(.+)/m,           // File: /path/to/file
+    /path=["']([^"']+)["']/,    // path="/path/to/file"
+    /^#\s*(\/\S+)/m,            // # /path/to/file
+    /^((?:\/|\.\/|\.\.\/)[\w./\-]+\.\w+)/m,  // bare path
   ];
   for (const re of patterns) {
     const m = ctx.match(re);
