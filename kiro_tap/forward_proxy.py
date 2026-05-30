@@ -508,7 +508,10 @@ class ForwardProxyServer:
             await client_writer.drain()
             return
 
-        if is_streaming and upstream_resp.status == 200:
+        resp_content_type = upstream_resp.headers.get("Content-Type", "")
+        is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
+
+        if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
             await self._handle_streaming(
                 upstream_resp,
                 client_writer,
