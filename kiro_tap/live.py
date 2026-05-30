@@ -177,6 +177,8 @@ class LiveViewerServer:
         """Serve the session-first dashboard."""
         if session_id := request.query.get("session_id"):
             raise web.HTTPFound(location=f"/dashboard/session/{quote(session_id, safe='')}")
+        if self.session_id:
+            raise web.HTTPFound(location=f"/dashboard/session/{quote(self.session_id, safe='')}")
         try:
             html = read_dashboard_template()
         except OSError:
