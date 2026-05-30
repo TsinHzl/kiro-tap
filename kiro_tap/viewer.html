@@ -3944,6 +3944,9 @@ function renderDetail(e) {
   const sysBlocks = extractSystemBlocks(reqBody);
   const respOutput = getResponseOutput(e);
   const msgs = getMessages(reqBody);
+  if (reqBody?.conversationState && respOutput?.content) {
+    msgs.push({role: 'assistant', content: respOutput.content});
+  }
   const contextOnly = shouldRenderRequestContext(e, reqBody, msgs, respOutput);
   const streamEvents = getResponseEvents(e);
   html += renderDetailViewTabs();
@@ -3961,7 +3964,7 @@ function renderDetail(e) {
     const messagesSection = msgs && msgs.length
       ? section(contextOnly ? t('section_context') : t('section_messages'), renderMessages(msgs), true, null, msgs.length + ' ' + t('badge_messages'))
       : '';
-    const responseSection = respOutput?.content || contextOnly
+    const responseSection = respOutput?.content && !reqBody?.conversationState || contextOnly
       ? section(t('section_response'), renderResponseContent(respOutput, contextOnly), true)
       : '';
     const streamSection = streamEvents.length
