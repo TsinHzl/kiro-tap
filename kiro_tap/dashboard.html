@@ -1457,6 +1457,15 @@ function renderDetail(session, records) {
   $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
   $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
   updateTracePathBar(session);
+
+  if (state.activeTab === "conversation") {
+    const existingFrame = document.querySelector("[data-viewer-frame]");
+    if (existingFrame && existingFrame.dataset.sessionId === session.id) {
+      existingFrame.src = `/api/sessions/${encodeURIComponent(session.id)}/html`;
+      return;
+    }
+  }
+
   $("#detail").innerHTML = `
     <div class="detail-inspector-bar">
       <div class="detail-tabs">
@@ -1474,6 +1483,7 @@ function renderDetail(session, records) {
         <iframe
           class="viewer-frame"
           data-viewer-frame
+          data-session-id="${esc(session.id)}"
           src="/api/sessions/${encodeURIComponent(session.id)}/html"
           title="${esc(t("session_details", {agent: session.agent || t("session_detail")}))}"
         ></iframe>
