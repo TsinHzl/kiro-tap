@@ -17,6 +17,7 @@ import aiohttp
 from aiohttp import web
 from yarl import URL
 
+from kiro_tap.aws_event_stream import AWSEventStreamReassembler
 from kiro_tap.sse import SSEReassembler
 from kiro_tap.trace import TraceWriter
 from kiro_tap.usage import normalize_usage
@@ -257,7 +258,10 @@ async def proxy_handler(request: web.Request) -> web.StreamResponse:
         )
         return web.Response(status=502, text=str(exc))
 
-    if is_streaming and upstream_resp.status == 200:
+    resp_content_type = upstream_resp.headers.get("Content-Type", "")
+    is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
+
+    if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
         resp_body = await _handle_streaming(
             request,
             upstream_resp,
@@ -268,6 +272,7 @@ async def proxy_handler(request: web.Request) -> web.StreamResponse:
             writer,
             log_prefix,
             upstream_base_url=target,
+            use_aws_reassembler=is_aws_eventstream,
             store_stream_events=bool(ctx.get("store_stream_events", False)),
         )
         return resp_body
@@ -295,7 +300,8 @@ async def _handle_streaming(
     writer: TraceWriter,
     log_prefix: str,
     upstream_base_url: str,
-    store_stream_events: bool,
+    use_aws_reassembler: bool = False,
+    store_stream_events: bool = False,
 ) -> web.StreamResponse:
     resp = web.StreamResponse(
         status=upstream_resp.status,
@@ -303,7 +309,10 @@ async def _handle_streaming(
     )
     await resp.prepare(request)
 
-    reassembler = SSEReassembler(store_events=store_stream_events)
+    if use_aws_reassembler:
+        reassembler = AWSEventStreamReassembler(store_events=store_stream_events)
+    else:
+        reassembler = SSEReassembler(store_events=store_stream_events)
 
     try:
         async for chunk in upstream_resp.content.iter_any():
