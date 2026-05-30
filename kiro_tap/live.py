@@ -184,8 +184,12 @@ class LiveViewerServer:
         return web.Response(text=html, content_type="text/html")
 
     async def _handle_dashboard_session_detail(self, request: web.Request) -> web.Response:
-        """Serve a dashboard session as the standalone trace viewer page."""
-        return await self._session_html_response(request.match_info["session_id"])
+        """Serve the dashboard SPA shell — frontend routes to session detail."""
+        try:
+            html = read_dashboard_template()
+        except OSError:
+            return web.Response(status=404, text="dashboard.html not found")
+        return web.Response(text=html, content_type="text/html")
 
     async def _handle_dashboard_health(self, request: web.Request) -> web.Response:
         return web.json_response({"ok": True, "db_path": str(resolve_db_path())})

@@ -1335,7 +1335,12 @@ function statusInfo(session) {
 }
 
 function openSession(sessionId) {
-  window.location.assign(sessionDetailUrl(sessionId));
+  state.selectedSessionId = sessionId;
+  state.view = "detail";
+  history.pushState({sessionId}, "", sessionDetailUrl(sessionId));
+  showDetailView();
+  showDetailLoading(sessionId);
+  loadSession(sessionId).catch(console.error);
 }
 
 function showListView() {
@@ -1842,13 +1847,32 @@ $("#status-filter").addEventListener("change", event => {
 
 $("#refresh").addEventListener("click", () => refreshSessions({preserveSelection: true, refreshDetail: true}).catch(console.error));
 $("#back-to-list").addEventListener("click", () => {
-  window.location.assign(dashboardListUrl());
+  state.selectedSessionId = null;
+  state.view = "list";
+  history.pushState({}, "", dashboardListUrl());
+  showListView();
+  refreshSessions({preserveSelection: false}).catch(console.error);
 });
 $("#lang-select").addEventListener("change", event => setLang(event.target.value));
 
 applyI18n();
 updateClock();
 setInterval(updateClock, 1000);
+window.addEventListener("popstate", () => {
+  const sessionId = initialSessionId();
+  if (sessionId) {
+    state.selectedSessionId = sessionId;
+    state.view = "detail";
+    showDetailView();
+    showDetailLoading(sessionId);
+    loadSession(sessionId).catch(console.error);
+  } else {
+    state.selectedSessionId = null;
+    state.view = "list";
+    showListView();
+    refreshSessions({preserveSelection: false}).catch(console.error);
+  }
+});
 connectEvents();
 refreshSessions({preserveSelection: false}).catch(error => {
   $("#detail").innerHTML = `<div class="empty">${esc(t("unable_load_dashboard", {error: error.message}))}</div>`;
