@@ -123,6 +123,7 @@ def _spawn_dashboard_subprocess_if_needed(host: str, port: int, output_dir: Path
     with _dashboard_spawn_lock():
         if _sync_dashboard_healthy_for_current_db(host, port):
             return False
+        _kill_process_on_port(port)
         _spawn_dashboard_subprocess(host, port, output_dir)
         return True
 
@@ -198,6 +199,40 @@ def _dashboard_cmd_prefix() -> list[str]:
     if argv0.name in ("kiro-tap", "kiro_tap") and argv0.exists():
         return [str(argv0)]
     return [sys.executable, "-m", "kiro_tap"]
+
+
+def _kill_process_on_port(port: int) -> None:
+    """Kill any process listening on the given port (best-effort)."""
+    import signal
+
+    try:
+        import psutil  # type: ignore[import]
+
+        for conn in psutil.net_connections(kind="inet"):
+            if conn.laddr.port == port and conn.status == "LISTEN" and conn.pid:
+                try:
+                    os.kill(conn.pid, signal.SIGTERM)
+                except (ProcessLookupError, PermissionError):
+                    pass
+        return
+    except ImportError:
+        pass
+
+    # Fallback: lsof (macOS/Linux)
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", f":{port}"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        for pid_str in result.stdout.strip().splitlines():
+            try:
+                os.kill(int(pid_str), signal.SIGTERM)
+            except (ValueError, ProcessLookupError, PermissionError):
+                pass
+    except (OSError, subprocess.TimeoutExpired):
+        pass
 
 
 def _spawn_dashboard_subprocess(host: str, port: int, output_dir: Path) -> subprocess.Popen[bytes]:
