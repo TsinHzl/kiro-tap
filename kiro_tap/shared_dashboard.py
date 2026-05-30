@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -182,11 +183,26 @@ async def wait_for_dashboard_healthy(
     return False
 
 
+def _dashboard_cmd_prefix() -> list[str]:
+    """Return the command prefix that runs kiro-tap in the correct Python env.
+
+    Prefer the installed ``kiro-tap`` script so its shebang selects the right
+    interpreter, regardless of which Python is currently running.  Fall back to
+    ``sys.argv[0]`` when we are already inside the script, and finally to
+    ``sys.executable -m kiro_tap`` as a last resort.
+    """
+    script = shutil.which("kiro-tap")
+    if script:
+        return [script]
+    argv0 = Path(sys.argv[0])
+    if argv0.name in ("kiro-tap", "kiro_tap") and argv0.exists():
+        return [str(argv0)]
+    return [sys.executable, "-m", "kiro_tap"]
+
+
 def _spawn_dashboard_subprocess(host: str, port: int, output_dir: Path) -> subprocess.Popen[bytes]:
     cmd = [
-        sys.executable,
-        "-m",
-        "kiro_tap",
+        *_dashboard_cmd_prefix(),
         "dashboard",
         "--tap-live-port",
         str(port),
