@@ -1232,7 +1232,8 @@ async function refreshSessions({preserveSelection = true, refreshDetail = false}
     if (state.view === "detail" && state.selectedSessionId) {
       showDetailView();
       const selected = state.sessions.find(session => session.id === state.selectedSessionId);
-      if (!selected || !state.detailSessionId || refreshDetail) {
+      const fingerprintChanged = selected && state.detailFingerprint && sessionDetailFingerprint(selected) !== state.detailFingerprint;
+      if (!selected || !state.detailSessionId || refreshDetail || fingerprintChanged) {
         if (!state.detailSessionId) showDetailLoading(state.selectedSessionId);
         await loadSession(state.selectedSessionId, {preserveLoaded: true});
       } else {
@@ -1461,7 +1462,7 @@ function renderDetail(session, records) {
   if (state.activeTab === "conversation") {
     const existingFrame = document.querySelector("[data-viewer-frame]");
     if (existingFrame && existingFrame.dataset.sessionId === session.id) {
-      existingFrame.src = `/api/sessions/${encodeURIComponent(session.id)}/html`;
+      existingFrame.src = `/api/sessions/${encodeURIComponent(session.id)}/html?_t=${Date.now()}`;
       return;
     }
   }
