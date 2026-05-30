@@ -1,6 +1,6 @@
 # 任务清单：kiro-tap-ui-redesign
 
-## 状态：DONE
+## 状态：ARCHIVED
 
 ## 任务
 - [x] dashboard.html：替换 `:root` CSS 变量为深色紫黑主题，删除 `[data-theme="dark"]` 块
