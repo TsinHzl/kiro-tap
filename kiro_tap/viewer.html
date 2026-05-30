@@ -550,6 +550,24 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .msg.assistant { background: var(--green-bg); border-color: rgba(34,197,94,0.3); }
 .msg.system { background: var(--amber-bg); border-color: rgba(234,179,8,0.3); }
 .msg.tool_result { background: var(--purple-bg); border-color: rgba(168,85,247,0.25); }
+.msg--history { opacity: 0.7; }
+.msg-context { background: rgba(100,100,100,0.06); border-color: rgba(150,150,150,0.25); border-left: 3px solid rgba(150,150,150,0.4); padding: 6px 12px; border-radius: 6px; margin-bottom: 8px; list-style: none; }
+.msg-context--history { opacity: 0.6; }
+.msg-context summary { cursor: pointer; display: flex; align-items: center; gap: 8px; user-select: none; }
+.msg-context summary::-webkit-details-marker { display: none; }
+.msg-context[open] summary { margin-bottom: 8px; }
+.msg-context .content-block { margin-top: 0; font-family: var(--mono); font-size: 11px; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
+.msg-context-meta { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+.msg-context .msg-role { background: rgba(150,150,150,0.3); color: var(--text-muted); }
+.msg-history-badge { font-size: 9px; opacity: 0.7; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.viewer-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+.viewer-table th { text-align: left; padding: 5px 10px; background: var(--bg-code, rgba(0,0,0,0.1)); color: var(--text-muted, #888); font-weight: 600; border-bottom: 1px solid var(--border, rgba(255,255,255,0.1)); }
+.viewer-table td { padding: 5px 10px; border-bottom: 1px solid var(--border, rgba(255,255,255,0.06)); word-break: break-all; }
+.viewer-table tr:last-child td { border-bottom: none; }
+.viewer-table--compact td { padding: 3px 10px; }
+.viewer-table .tele-key { color: var(--text-muted, #888); font-family: var(--mono); width: 220px; }
+.viewer-table .tele-val { font-family: var(--mono); }
+.badge-inline { display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: var(--primary, #a855f7); color: #fff; vertical-align: middle; margin-left: 4px; }
 .msg-role {
   display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .5px; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px;
@@ -3940,8 +3958,15 @@ function renderDetail(e) {
     const jsonSection = section(t('section_json'), `<div class="json-view">${renderJSONTree(e)}</div>`, false, JSON.stringify(e, null, 2));
     html += actionBarHtml;
     if (usage) html += renderTokenUsage(usage);
-    html += toolsSection + systemSection + messagesSection + responseSection;
-    if (streamEvents.length) html += streamSection;
+    const amzTarget = recordAmzTargetFromEntry(e);
+    if (amzTarget === 'ListAvailableModels') {
+      html += renderViewerModelsSection(e);
+    } else if (amzTarget === 'SendTelemetryEvent') {
+      html += renderViewerTelemetrySection(e);
+    } else {
+      html += toolsSection + systemSection + messagesSection + responseSection;
+      if (streamEvents.length) html += streamSection;
+    }
     html += jsonSection;
   } else if (detailViewMode === 'trace') {
     html += renderTraceDetail(e, { reqBody, sysPrompt, msgs, tools, respOutput, contextOnly, streamEvents, usage });
@@ -4410,6 +4435,71 @@ function getResponsesContinuationInfo(entry) {
 }
 
 // Normalize messages from Chat Completions (body.messages) or Responses API (body.input)
+function recordAmzTargetFromEntry(entry) {
+  const headers = (entry.request || {}).headers || {};
+  const target = headers['x-amz-target'] || headers['X-Amz-Target'] || '';
+  const dot = target.lastIndexOf('.');
+  return dot >= 0 ? target.slice(dot + 1) : target;
+}
+
+function renderViewerModelsSection(entry) {
+  const body = (entry.response || {}).body || {};
+  const models = Array.isArray(body.models) ? body.models : [];
+  const defaultModel = (body.defaultModel || {}).modelId || '';
+  const rows = models.map(m => `
+    <tr>
+      <td>${esc(m.modelId || '')}${m.modelId === defaultModel ? ' <span class="badge-inline">default</span>' : ''}</td>
+      <td>${esc(m.modelName || '')}</td>
+      <td>${esc((m.tokenLimits || {}).maxInputTokens?.toLocaleString() || '')}</td>
+      <td>${esc((m.tokenLimits || {}).maxOutputTokens?.toLocaleString() || '')}</td>
+      <td>${esc(m.rateMultiplier != null ? m.rateMultiplier + ' ' + (m.rateUnit || '') : '')}</td>
+    </tr>
+  `).join('');
+  const tableHtml = `<table class="viewer-table">
+    <thead><tr><th>Model ID</th><th>Name</th><th>Max Input</th><th>Max Output</th><th>Rate</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+  return section('Available Models', tableHtml, true, null, models.length + ' models');
+}
+
+function renderViewerTelemetrySection(entry) {
+  const body = (entry.request || {}).body || {};
+  const event = body.telemetryEvent || {};
+  const eventType = Object.keys(event)[0] || 'unknown';
+  const payload = event[eventType] || {};
+  const rows = Object.entries(payload).map(([k, v]) => `
+    <tr><td class="tele-key">${esc(k)}</td><td class="tele-val">${esc(typeof v === 'object' ? JSON.stringify(v) : String(v))}</td></tr>
+  `).join('');
+  const tableHtml = `<table class="viewer-table viewer-table--compact"><tbody>${rows}</tbody></table>`;
+  return section('Telemetry · ' + eventType, tableHtml, true);
+}
+
+function parseKiroUserContent(content, isHistory) {
+  if (typeof content !== 'string') return [{role: 'user', content}];
+  const results = [];
+  // Extract all CONTEXT ENTRY blocks
+  const contextBlocks = [];
+  const contextRe = /---\s*CONTEXT ENTRY BEGIN\s*---\n?([\s\S]*?)(?:---\s*CONTEXT ENTRY END\s*---\n?|$)/g;
+  let match;
+  while ((match = contextRe.exec(content)) !== null) {
+    const ctx = match[1].trim();
+    if (ctx) contextBlocks.push(ctx);
+  }
+  if (contextBlocks.length > 0) {
+    results.push({role: 'user', content: contextBlocks.join('\n\n'), isContext: true, isHistory});
+  }
+  // Extract USER MESSAGE block if present
+  const userMsgMatch = content.match(/---\s*USER MESSAGE BEGIN\s*---\n?([\s\S]*?)(?:---\s*USER MESSAGE END\s*---|$)/);
+  if (userMsgMatch) {
+    const userMsg = userMsgMatch[1].trim();
+    if (userMsg) results.push({role: 'user', content: userMsg, isHistory});
+  } else if (contextBlocks.length === 0) {
+    // No markers at all — treat as plain user message
+    results.push({role: 'user', content, isHistory});
+  }
+  return results;
+}
+
 function getMessages(body) {
   if (!body) return [];
   if (Array.isArray(body.messages) && body.messages.length > 0) {
@@ -4427,12 +4517,14 @@ function getMessages(body) {
     const msgs = [];
     if (Array.isArray(cs.history)) {
       for (const item of cs.history) {
-        if (item.userInputMessage) msgs.push({role: 'user', content: item.userInputMessage.content});
+        if (item.userInputMessage) {
+          msgs.push(...parseKiroUserContent(item.userInputMessage.content, true));
+        }
         if (item.assistantResponseMessage) msgs.push({role: 'assistant', content: item.assistantResponseMessage.content});
       }
     }
     if (cs.currentMessage?.userInputMessage) {
-      msgs.push({role: 'user', content: cs.currentMessage.userInputMessage.content});
+      msgs.push(...parseKiroUserContent(cs.currentMessage.userInputMessage.content, false));
     }
     return msgs.filter(m => hasDisplayContent(m.content));
   }
@@ -4680,10 +4772,19 @@ function renderMessages(msgs) {
   return msgs.map(m => {
     const role = m.role || 'unknown';
     const cls = role === 'user' ? 'user' : role === 'assistant' ? 'assistant' : role === 'tool' ? 'tool_result' : (role === 'developer' || role === 'system') ? 'system' : 'system';
+    if (m.isContext) {
+      const historyLabel = m.isHistory ? ' · history' : '';
+      const lineCount = typeof m.content === 'string' ? m.content.split('\n').length : 0;
+      return `<details class="msg msg-context${m.isHistory ? ' msg-context--history' : ''}">
+        <summary><span class="msg-role">context${historyLabel}</span> <span class="msg-context-meta">${lineCount} lines</span></summary>
+        <div class="content-block content-block-text">${esc(m.content)}</div>
+      </details>`;
+    }
+    const historyClass = m.isHistory ? ' msg--history' : '';
     const blockCount = normalizeDisplayContentBlocks(m.content).length;
     const rendered = renderContent(m.content, role, { frameBlocks: blockCount > 1 });
     if (!rendered.trim()) return '';
-    return `<div class="msg ${cls}"><div class="msg-role">${esc(role)}</div>${rendered}</div>`;
+    return `<div class="msg ${cls}${historyClass}"><div class="msg-role">${esc(role)}${m.isHistory ? ' <span class="msg-history-badge">history</span>' : ''}</div>${rendered}</div>`;
   }).filter(Boolean).join('');
 }
 

@@ -664,6 +664,18 @@ body.detail-route .detail-inspector-bar {
 }
 .msg.user .msg-role { background: var(--primary); color: #fff; }
 .msg.assistant .msg-role { background: var(--green); color: #fff; }
+.msg-role--history { opacity: 0.6; font-style: italic; }
+.msg.user .msg-role--history { background: var(--primary); }
+.msg.assistant .msg-role--history { background: var(--green); }
+.section--telemetry { opacity: 0.85; }
+.section--telemetry .section-header .title { color: var(--text-muted); }
+.record-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+.record-table th { text-align: left; padding: 5px 10px; background: var(--bg-code); color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.record-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); word-break: break-all; }
+.record-table tr:last-child td { border-bottom: none; }
+.record-table--compact td { padding: 3px 10px; }
+.tele-key { color: var(--text-muted); font-family: var(--mono); width: 220px; }
+.tele-val { font-family: var(--mono); }
 .content-block { margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
 .content-block:first-child { margin-top: 0; }
 .json-view {
@@ -1516,24 +1528,146 @@ function updateDetailI18n(session) {
   });
 }
 
+function recordAmzTarget(record) {
+  const headers = (record.request || {}).headers || {};
+  const target = headers["x-amz-target"] || headers["X-Amz-Target"] || "";
+  const dot = target.lastIndexOf(".");
+  return dot >= 0 ? target.slice(dot + 1) : target;
+}
+
 function renderRecord(record, index) {
+  const target = recordAmzTarget(record);
+  if (target === "GenerateAssistantResponse") return renderConversationRecord(record, index);
+  if (target === "ListAvailableModels") return renderModelsRecord(record, index);
+  if (target === "SendTelemetryEvent") return renderTelemetryRecord(record, index);
+  return renderGenericRecord(record, index);
+}
+
+function recordHeader(record, index, label, badgeExtra) {
+  const request = record.request || {};
+  const response = record.response || {};
+  const status = response.status ?? "";
+  const statusClass = Number(status) >= 400 ? "error" : "";
+  const jsonId = `json-${index}`;
+  return { status, statusClass, jsonId, header: `
+    <div class="section-header">
+      <span class="chevron">&#9654;</span>
+      <span class="title">Turn ${esc(record.turn ?? index + 1)} · ${esc(label)}</span>
+      <span class="badge ${statusClass}">${esc(status || t("ok"))}</span>
+      ${badgeExtra || ""}
+      <button class="json-btn" data-json-toggle="${jsonId}">${esc(t("json"))}</button>
+    </div>
+    <div id="${jsonId}" class="json-view"><pre data-json-index="${index}"></pre></div>
+  `};
+}
+
+function renderConversationRecord(record, index) {
+  const body = (record.request || {}).body || {};
+  const cs = body.conversationState || {};
+  const history = Array.isArray(cs.history) ? cs.history : [];
+  const current = cs.currentMessage || {};
+  const { header, jsonId } = recordHeader(record, index, "Chat");
+
+  const historyHtml = history.map((entry, i) => {
+    if (entry.userInputMessage) {
+      const raw = entry.userInputMessage.content || "";
+      const cleaned = cleanContextContent(raw);
+      return `<div class="msg user"><span class="msg-role msg-role--history">History · User</span><div class="content-block">${esc(cleaned)}</div></div>`;
+    }
+    if (entry.assistantResponseMessage) {
+      const text = entry.assistantResponseMessage.content || "";
+      return `<div class="msg assistant"><span class="msg-role msg-role--history">History · Assistant</span><div class="content-block">${esc(text)}</div></div>`;
+    }
+    return "";
+  }).join("");
+
+  const currentUserText = cleanContextContent((current.userInputMessage || {}).content || "");
+  const responseText = responseTextFromRecord(record) || (record.response || {}).error || t("response_empty");
+
+  return `
+    <article class="section">
+      ${header}
+      <div class="section-body">
+        <div class="conversation">
+          ${historyHtml}
+          <div class="msg user"><span class="msg-role">User</span><div class="content-block">${esc(currentUserText || t("request_empty"))}</div></div>
+          <div class="msg assistant"><span class="msg-role">Assistant</span><div class="content-block">${esc(responseText)}</div></div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function cleanContextContent(text) {
+  if (!text) return "";
+  // Strip --- CONTEXT ENTRY BEGIN --- blocks (file context injected by the client)
+  return text.replace(/---\s*CONTEXT ENTRY BEGIN\s*---[\s\S]*?---\s*CONTEXT ENTRY END\s*---\n?/g, "[context omitted]\n")
+             .replace(/^---\s*CONTEXT ENTRY BEGIN\s*---[\s\S]*/m, "[context omitted]")
+             .trim();
+}
+
+function renderModelsRecord(record, index) {
+  const body = (record.response || {}).body || {};
+  const models = Array.isArray(body.models) ? body.models : [];
+  const defaultModel = (body.defaultModel || {}).modelId || "";
+  const { header } = recordHeader(record, index, "List Models", `<span class="badge">${esc(models.length + " models")}</span>`);
+
+  const rows = models.map(m => `
+    <tr>
+      <td>${esc(m.modelId || "")}${m.modelId === defaultModel ? ' <span class="badge">default</span>' : ""}</td>
+      <td>${esc(m.modelName || "")}</td>
+      <td>${esc((m.tokenLimits || {}).maxInputTokens?.toLocaleString() || "")}</td>
+      <td>${esc((m.tokenLimits || {}).maxOutputTokens?.toLocaleString() || "")}</td>
+      <td>${esc(m.rateMultiplier != null ? m.rateMultiplier + " " + (m.rateUnit || "") : "")}</td>
+    </tr>
+  `).join("");
+
+  return `
+    <article class="section">
+      ${header}
+      <div class="section-body">
+        <table class="record-table">
+          <thead><tr><th>Model ID</th><th>Name</th><th>Max Input</th><th>Max Output</th><th>Rate</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderTelemetryRecord(record, index) {
+  const body = (record.request || {}).body || {};
+  const event = body.telemetryEvent || {};
+  const eventType = Object.keys(event)[0] || "unknown";
+  const payload = event[eventType] || {};
+  const { header } = recordHeader(record, index, "Telemetry · " + eventType);
+
+  const rows = Object.entries(payload).map(([k, v]) => `
+    <tr><td class="tele-key">${esc(k)}</td><td class="tele-val">${esc(typeof v === "object" ? JSON.stringify(v) : String(v))}</td></tr>
+  `).join("");
+
+  return `
+    <article class="section section--telemetry">
+      ${header}
+      <div class="section-body">
+        <table class="record-table record-table--compact">
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </article>
+  `;
+}
+
+function renderGenericRecord(record, index) {
   const request = record.request || {};
   const response = record.response || {};
   const userText = requestText(request.body) || t("request_empty");
   const responseText = responseTextFromRecord(record) || response.error || t("response_empty");
-  const status = response.status ?? "";
   const path = request.path || "";
-  const jsonId = `json-${index}`;
-  const statusClass = Number(status) >= 400 ? "error" : "";
+  const { header } = recordHeader(record, index, path || "Request");
   return `
     <article class="section">
-      <div class="section-header">
-        <span class="chevron">&#9654;</span>
-        <span class="title">Turn ${esc(record.turn ?? index + 1)}</span>
-        <span class="badge ${statusClass}">${esc(status || t("ok"))}</span>
-        <span class="path">${esc(path)}</span>
-        <button class="json-btn" data-json-toggle="${jsonId}">${esc(t("json"))}</button>
-      </div>
+      ${header}
       <div class="section-body">
         <div class="conversation">
           <div class="msg user">
@@ -1545,7 +1679,6 @@ function renderRecord(record, index) {
             <div class="content-block">${esc(responseText)}</div>
           </div>
         </div>
-        <div id="${jsonId}" class="json-view"><pre data-json-index="${index}"></pre></div>
       </div>
     </article>
   `;
