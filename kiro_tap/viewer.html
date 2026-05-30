@@ -560,6 +560,7 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .msg-context-meta { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
 .msg-context .msg-role { background: rgba(150,150,150,0.3); color: var(--text-muted); }
 .msg-history-badge { font-size: 9px; opacity: 0.7; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.msg-context-filename { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
 .viewer-table th { text-align: left; padding: 5px 10px; background: var(--bg-code, rgba(0,0,0,0.1)); color: var(--text-muted, #888); font-weight: 600; border-bottom: 1px solid var(--border, rgba(255,255,255,0.1)); }
 .viewer-table td { padding: 5px 10px; border-bottom: 1px solid var(--border, rgba(255,255,255,0.06)); word-break: break-all; }
@@ -4474,26 +4475,41 @@ function renderViewerTelemetrySection(entry) {
   return section('Telemetry · ' + eventType, tableHtml, true);
 }
 
+function extractContextFilePath(ctx) {
+  const patterns = [
+    /^File:\s*(.+)/m,
+    /path=["']([^"']+)["']/,
+    /^#\s*(\/\S+)/m,
+    /^((?:\/|\.\/|\.\.\/)[\w./\-]+\.\w+)/m,
+  ];
+  for (const re of patterns) {
+    const m = ctx.match(re);
+    if (m) return m[1].trim();
+  }
+  const firstLine = ctx.split('\n').find(l => l.trim());
+  return firstLine && firstLine.length < 120 ? firstLine.trim() : null;
+}
+
 function parseKiroUserContent(content, isHistory) {
   if (typeof content !== 'string') return [{role: 'user', content}];
   const results = [];
-  // Extract all CONTEXT ENTRY blocks
-  const contextBlocks = [];
+  // Each CONTEXT ENTRY becomes its own object for independent rendering
   const contextRe = /---\s*CONTEXT ENTRY BEGIN\s*---\n?([\s\S]*?)(?:---\s*CONTEXT ENTRY END\s*---\n?|$)/g;
   let match;
+  let hasContext = false;
   while ((match = contextRe.exec(content)) !== null) {
     const ctx = match[1].trim();
-    if (ctx) contextBlocks.push(ctx);
-  }
-  if (contextBlocks.length > 0) {
-    results.push({role: 'user', content: contextBlocks.join('\n\n'), isContext: true, isHistory});
+    if (ctx) {
+      hasContext = true;
+      results.push({role: 'user', content: ctx, isContext: true, isHistory, filePath: extractContextFilePath(ctx)});
+    }
   }
   // Extract USER MESSAGE block if present
   const userMsgMatch = content.match(/---\s*USER MESSAGE BEGIN\s*---\n?([\s\S]*?)(?:---\s*USER MESSAGE END\s*---|$)/);
   if (userMsgMatch) {
     const userMsg = userMsgMatch[1].trim();
     if (userMsg) results.push({role: 'user', content: userMsg, isHistory});
-  } else if (contextBlocks.length === 0) {
+  } else if (!hasContext) {
     // No markers at all — treat as plain user message
     results.push({role: 'user', content, isHistory});
   }
@@ -4775,8 +4791,12 @@ function renderMessages(msgs) {
     if (m.isContext) {
       const historyLabel = m.isHistory ? ' · history' : '';
       const lineCount = typeof m.content === 'string' ? m.content.split('\n').length : 0;
+      const fileName = m.filePath ? m.filePath.split('/').pop() : null;
+      const fileLabel = fileName
+        ? `<span class="msg-context-filename" title="${esc(m.filePath)}">${esc(fileName)}</span>`
+        : `<span class="msg-context-filename">context${historyLabel}</span>`;
       return `<details class="msg msg-context${m.isHistory ? ' msg-context--history' : ''}">
-        <summary><span class="msg-role">context${historyLabel}</span> <span class="msg-context-meta">${lineCount} lines</span></summary>
+        <summary><span class="msg-role">ctx${historyLabel}</span>${fileLabel}<span class="msg-context-meta">${lineCount} lines</span></summary>
         <div class="content-block content-block-text">${esc(m.content)}</div>
       </details>`;
     }
