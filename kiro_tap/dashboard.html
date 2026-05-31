@@ -650,6 +650,13 @@ body.detail-route .detail-inspector-bar {
   color: var(--text-tertiary); margin-left: auto; transition: all .15s;
 }
 .section-header .json-btn:hover { color: var(--primary); border-color: var(--primary); }
+.section-header .copy-conv-btn {
+  font-size: 11px; padding: 3px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-tertiary); transition: all .15s; margin-left: auto;
+}
+.section-header .copy-conv-btn:hover { color: var(--primary); border-color: var(--primary); }
+.section-header .copy-conv-btn ~ .json-btn { margin-left: 6px; }
 .section-body { padding: 0 16px 16px; overflow-x: auto; }
 .conversation { display: grid; gap: 8px; }
 .msg {
@@ -951,6 +958,8 @@ const DASHBOARD_I18N = {
     request: "Request",
     response: "Response",
     json: "JSON",
+    copy_conversation: "Copy",
+    copied: "Copied!",
     ok: "ok",
     empty_session: "This session has no captured API records yet."
   },
@@ -1030,6 +1039,8 @@ const DASHBOARD_I18N = {
     request: "请求",
     response: "响应",
     json: "JSON",
+    copy_conversation: "复制",
+    copied: "已复制！",
     ok: "正常",
     empty_session: "这个会话还没有捕获到 API 记录。"
   }
@@ -1120,6 +1131,9 @@ function esc(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 }
+
+function encodeCopy(text) { return btoa(unescape(encodeURIComponent(String(text ?? "")))); }
+function decodeCopy(b64) { return decodeURIComponent(escape(atob(b64))); }
 
 function loadingMarkup(label) {
   return `<span class="loading-state"><span class="spinner" aria-hidden="true"></span><span>${esc(label)}</span></span>`;
@@ -1531,6 +1545,27 @@ function renderDetail(session, records) {
   document.querySelectorAll("[data-copy-path]").forEach(button => {
     button.addEventListener("click", () => navigator.clipboard?.writeText(button.dataset.copyPath || ""));
   });
+  document.querySelectorAll("[data-copy-conv]").forEach(button => {
+    button.addEventListener("click", () => {
+      const text = decodeCopy(button.dataset.copyConv || "");
+      const flash = () => {
+        const orig = button.textContent;
+        button.textContent = t("copied");
+        setTimeout(() => { button.textContent = orig; }, 1500);
+      };
+      const writer = navigator.clipboard?.writeText
+        ? navigator.clipboard.writeText(text)
+        : Promise.reject();
+      writer.then(flash).catch(() => {
+        const ta = document.createElement("textarea");
+        ta.value = text; ta.style.position = "fixed"; ta.style.top = "-9999px"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        try { document.execCommand("copy"); } catch (e) {}
+        document.body.removeChild(ta);
+        flash();
+      });
+    });
+  });
 }
 
 function updateDetailI18n(session) {
@@ -1560,18 +1595,22 @@ function renderRecord(record, index) {
   return renderGenericRecord(record, index);
 }
 
-function recordHeader(record, index, label, badgeExtra) {
+function recordHeader(record, index, label, badgeExtra, copyText) {
   const request = record.request || {};
   const response = record.response || {};
   const status = response.status ?? "";
   const statusClass = Number(status) >= 400 ? "error" : "";
   const jsonId = `json-${index}`;
+  const copyBtn = copyText
+    ? `<button class="copy-conv-btn" data-copy-conv="${esc(encodeCopy(copyText))}">${esc(t("copy_conversation"))}</button>`
+    : "";
   return { status, statusClass, jsonId, header: `
     <div class="section-header">
       <span class="chevron">&#9654;</span>
       <span class="title">Turn ${esc(record.turn ?? index + 1)} · ${esc(label)}</span>
       <span class="badge ${statusClass}">${esc(status || t("ok"))}</span>
       ${badgeExtra || ""}
+      ${copyBtn}
       <button class="json-btn" data-json-toggle="${jsonId}">${esc(t("json"))}</button>
     </div>
     <div id="${jsonId}" class="json-view"><pre data-json-index="${index}"></pre></div>
@@ -1583,16 +1622,18 @@ function renderConversationRecord(record, index) {
   const cs = body.conversationState || {};
   const history = Array.isArray(cs.history) ? cs.history : [];
   const current = cs.currentMessage || {};
-  const { header, jsonId } = recordHeader(record, index, "Chat");
 
+  const copyLines = [];
   const historyHtml = history.map((entry, i) => {
     if (entry.userInputMessage) {
       const raw = entry.userInputMessage.content || "";
       const cleaned = cleanContextContent(raw);
+      copyLines.push(`History · User:\n${cleaned}`);
       return `<div class="msg user"><span class="msg-role msg-role--history">History · User</span><div class="content-block">${esc(cleaned)}</div></div>`;
     }
     if (entry.assistantResponseMessage) {
       const text = entry.assistantResponseMessage.content || "";
+      copyLines.push(`History · Assistant:\n${text}`);
       return `<div class="msg assistant"><span class="msg-role msg-role--history">History · Assistant</span><div class="content-block">${esc(text)}</div></div>`;
     }
     return "";
@@ -1600,6 +1641,10 @@ function renderConversationRecord(record, index) {
 
   const currentUserText = cleanContextContent((current.userInputMessage || {}).content || "");
   const responseText = responseTextFromRecord(record) || (record.response || {}).error || t("response_empty");
+  copyLines.push(`User:\n${currentUserText}`);
+  copyLines.push(`Assistant:\n${responseText}`);
+
+  const { header, jsonId } = recordHeader(record, index, "Chat", "", copyLines.join("\n\n"));
 
   return `
     <article class="section">
