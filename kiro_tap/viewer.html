@@ -560,6 +560,13 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .msg-context-meta { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
 .msg-context .msg-role { background: rgba(150,150,150,0.3); color: var(--text-muted); }
 .msg-history-badge { font-size: 9px; opacity: 0.7; font-weight: 400; text-transform: none; letter-spacing: 0; }
+.msg-context-copy {
+  font-size: 9px; padding: 2px 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-card);
+  color: var(--text-tertiary); cursor: pointer; transition: all .15s;
+  flex-shrink: 0; text-transform: uppercase; letter-spacing: .5px;
+}
+.msg-context-copy:hover { color: var(--primary); border-color: var(--primary); }
 .msg-context-filename { font-family: var(--mono); font-size: 11px; color: var(--text-secondary); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .viewer-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
 .viewer-table th { text-align: left; padding: 5px 10px; background: var(--bg-code, rgba(0,0,0,0.1)); color: var(--text-muted, #888); font-weight: 600; border-bottom: 1px solid var(--border, rgba(255,255,255,0.1)); }
@@ -4810,8 +4817,10 @@ function renderMessages(msgs) {
       const fileLabel = fileName
         ? `<span class="msg-context-filename" title="${esc(m.filePath)}">${esc(fileName)}</span>`
         : `<span class="msg-context-filename">context${historyLabel}</span>`;
+      const ctxCopyText = typeof m.content === 'string' ? m.content : '';
+      const ctxCopyBtn = `<button class="msg-context-copy" type="button" data-copy="${encodeCopyText(ctxCopyText)}">${t('copy')}</button>`;
       return `<details class="msg msg-context${m.isHistory ? ' msg-context--history' : ''}">
-        <summary><span class="msg-role">ctx${historyLabel}</span>${fileLabel}<span class="msg-context-meta">${lineCount} lines</span></summary>
+        <summary><span class="msg-role">ctx${historyLabel}</span>${fileLabel}<span class="msg-context-meta">${lineCount} lines</span>${ctxCopyBtn}</summary>
         <div class="content-block content-block-text">${esc(m.content)}</div>
       </details>`;
     }
@@ -5075,6 +5084,14 @@ function bindSections(container) {
   });
   container.querySelectorAll('.trace-copy-btn').forEach(btn => {
     btn.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const text = decodeURIComponent(escape(atob(btn.dataset.copy)));
+      copyToClipboard(text, btn);
+    });
+  });
+  container.querySelectorAll('.msg-context-copy').forEach(btn => {
+    btn.addEventListener('click', ev => {
+      ev.preventDefault();
       ev.stopPropagation();
       const text = decodeURIComponent(escape(atob(btn.dataset.copy)));
       copyToClipboard(text, btn);
