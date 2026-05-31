@@ -7,12 +7,12 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import signal
 import subprocess
 import sys
 import threading
-import time
 import urllib.error
 import urllib.request
 import webbrowser
@@ -512,6 +512,13 @@ async def async_main(args: argparse.Namespace):
     # Reverse proxy mode: aiohttp web app (current behavior)
     forward_server: ForwardProxyServer | None = None
     runner: web.AppRunner | None = None
+    if args.host not in ("127.0.0.1", "::1", "localhost"):
+        print(
+            f"⚠️  SECURITY: binding to {args.host} exposes this proxy on all interfaces "
+            "with NO authentication. Anyone who can reach this host can read intercepted "
+            "traffic (including request/response bodies) and use it as an open relay. "
+            "Use 127.0.0.1 unless you fully trust the network."
+        )
     exit_code = 0
     try:
         if args.proxy_mode == "forward":
@@ -564,9 +571,9 @@ async def async_main(args: argparse.Namespace):
         if not args.no_update_check:
             try:
                 latest = await _check_pypi_version()
-                if latest and _version_tuple(latest) > _version_tuple(__version__):
+                if latest and _version_key(latest) > _version_key(__version__):
                     print(f"⬆️  Update available: {__version__} → {latest}")
-                    if not args.no_auto_update:
+                    if args.auto_update:
                         installer = _detect_installer()
                         _start_background_update(installer)
                         print(f"   Downloading update in background ({installer})...")
@@ -821,20 +828,20 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Disable PyPI update check on startup",
     )
     storage_group.add_argument(
-        "--tap-no-auto-update",
+        "--tap-auto-update",
         action="store_true",
-        dest="no_auto_update",
-        help="Check for updates but don't auto-download",
+        dest="auto_update",
+        help="Auto-download updates in the background when a newer version is found (default: off)",
     )
     args, client_args = tap_parser.parse_known_args(argv)
     # Strip leading "--" separator if present (argparse leaves it in remainder)
     if client_args and client_args[0] == "--":
         client_args = client_args[1:]
     args.client_args = client_args
-    # Default host: 0.0.0.0 in --tap-no-launch mode (proxy-only, typically remote),
-    # 127.0.0.1 otherwise (launching the client locally).
+    # Default host: 127.0.0.1 (loopback only). Use --tap-host 0.0.0.0 to expose
+    # on all interfaces (unauthenticated — see startup warning).
     if args.host is None:
-        args.host = "0.0.0.0" if args.no_launch else "127.0.0.1"
+        args.host = "127.0.0.1"
     if args.target is None:
         args.target = CLIENT_CONFIGS[args.client].default_target
     if args.proxy_mode is None:
@@ -949,9 +956,36 @@ async def dashboard_main(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _version_tuple(v: str) -> tuple[int, ...]:
-    """Parse '0.1.4' into (0, 1, 4) for comparison."""
-    return tuple(int(x) for x in v.strip().split(".") if x.isdigit())
+def _version_key(v: str) -> tuple:
+    """Build a PEP440-aware sort key from a version string.
+
+    Handles release segments plus pre-release/dev/post suffixes so that
+    e.g. 0.2.0 > 0.2.0rc1 > 0.2.0b1 > 0.2.0a1 > 0.2.0.dev1, and
+    0.2.0.post1 > 0.2.0. Unknown suffixes are ignored gracefully.
+    """
+    s = v.strip().lower()
+    m = re.match(r"(\d+(?:\.\d+)*)(.*)$", s)
+    if not m:
+        return ((0,), 0, 0)
+    release = tuple(int(x) for x in m.group(1).split("."))
+    rest = m.group(2)
+
+    pre_rank = {"a": 0, "alpha": 0, "b": 1, "beta": 1, "rc": 2, "c": 2}
+    dev_m = re.search(r"\.?dev(\d*)", rest)
+    post_m = re.search(r"\.?post(\d*)", rest)
+    pre_m = re.search(r"(alpha|beta|rc|a|b|c)\.?(\d*)", rest)
+
+    if post_m:
+        phase, phase_num = 2, int(post_m.group(1) or 0)
+    elif pre_m:
+        phase = 0
+        phase_num = pre_rank.get(pre_m.group(1), 0) * 1000 + int(pre_m.group(2) or 0)
+    elif dev_m:
+        phase, phase_num = -1, int(dev_m.group(1) or 0)
+    else:
+        phase, phase_num = 1, 0
+
+    return (release, phase, phase_num)
 
 
 async def _check_pypi_version(timeout: float = 3.0) -> str | None:
@@ -985,7 +1019,12 @@ def _start_background_update(installer: str) -> subprocess.Popen | None:
         cmd = _build_update_command(installer)
         if cmd is None:
             return None
-        return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     except Exception:
         return None
 
@@ -1063,31 +1102,6 @@ def trust_ca_main(argv: list[str] | None = None) -> int:
     return _trust_ca_for_current_user(ca_cert_path)
 
 
-def _kill_stale_kiro_tap_processes() -> None:
-    """Kill any other kiro-tap processes (excluding self and dashboard subprocesses)."""
-    import signal
-
-    current_pid = os.getpid()
-    try:
-        result = subprocess.run(
-            ["pgrep", "-f", "kiro-tap"],
-            capture_output=True, text=True, timeout=3,
-        )
-        for pid_str in result.stdout.strip().splitlines():
-            try:
-                pid = int(pid_str)
-            except ValueError:
-                continue
-            if pid == current_pid:
-                continue
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except (ProcessLookupError, PermissionError):
-                pass
-    except (OSError, subprocess.TimeoutExpired):
-        pass
-
-
 def main_entry() -> None:
     """Entry point for the kiro-tap CLI."""
     if len(sys.argv) > 1 and sys.argv[1] == "export":
@@ -1108,9 +1122,6 @@ def main_entry() -> None:
         except KeyboardInterrupt:
             code = 0
         sys.exit(code)
-
-    # Kill any stale kiro-tap processes before starting
-    _kill_stale_kiro_tap_processes()
 
     args = parse_args()
     try:

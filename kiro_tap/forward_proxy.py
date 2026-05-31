@@ -44,6 +44,7 @@ from kiro_tap.trace import TraceWriter
 from kiro_tap.usage import normalize_usage
 from kiro_tap.ws_proxy import (
     _get_ws_proxy_settings,
+    _parse_ws_messages,
     reconstruct_ws_request_body,
     reconstruct_ws_response_body,
 )
@@ -508,35 +509,38 @@ class ForwardProxyServer:
             await client_writer.drain()
             return
 
-        resp_content_type = upstream_resp.headers.get("Content-Type", "")
-        is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
+        try:
+            resp_content_type = upstream_resp.headers.get("Content-Type", "")
+            is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
 
-        if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
-            await self._handle_streaming(
-                upstream_resp,
-                client_writer,
-                req_id,
-                turn,
-                t0,
-                method,
-                path,
-                headers,
-                req_body,
-                log_prefix,
-            )
-        else:
-            await self._handle_non_streaming(
-                upstream_resp,
-                client_writer,
-                req_id,
-                turn,
-                t0,
-                method,
-                path,
-                headers,
-                req_body,
-                log_prefix,
-            )
+            if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
+                await self._handle_streaming(
+                    upstream_resp,
+                    client_writer,
+                    req_id,
+                    turn,
+                    t0,
+                    method,
+                    path,
+                    headers,
+                    req_body,
+                    log_prefix,
+                )
+            else:
+                await self._handle_non_streaming(
+                    upstream_resp,
+                    client_writer,
+                    req_id,
+                    turn,
+                    t0,
+                    method,
+                    path,
+                    headers,
+                    req_body,
+                    log_prefix,
+                )
+        finally:
+            upstream_resp.close()
 
     async def _handle_streaming(
         self,
@@ -556,9 +560,10 @@ class ForwardProxyServer:
         status_line = f"HTTP/1.1 {upstream_resp.status} {upstream_resp.reason}\r\n"
         client_writer.write(status_line.encode())
 
-        # Send response headers (filter hop-by-hop, use chunked transfer)
+        # Send response headers (filter hop-by-hop, drop upstream Content-Length
+        # since we re-frame the body as chunked — RFC 7230 forbids both together).
         for key, value in upstream_resp.headers.items():
-            if key.lower() not in HOP_BY_HOP:
+            if key.lower() not in HOP_BY_HOP and key.lower() != "content-length":
                 client_writer.write(f"{key}: {value}\r\n".encode())
         client_writer.write(b"Transfer-Encoding: chunked\r\n")
         client_writer.write(b"\r\n")
@@ -871,16 +876,14 @@ class ForwardProxyServer:
             "headers": filter_headers(headers, redact_keys=True),
             "body": reconstruct_ws_request_body(client_messages),
         }
-        response_events = [json.loads(msg) if msg.startswith("{") else {"raw": msg} for msg in server_messages]
+        response_events = _parse_ws_messages(server_messages)
         response_record = {
             "status": 101,
             "headers": {},
             "body": reconstruct_ws_response_body(response_events),
         }
         if self._store_stream_events:
-            request_record["ws_events"] = [
-                json.loads(msg) if msg.startswith("{") else {"raw": msg} for msg in client_messages
-            ]
+            request_record["ws_events"] = _parse_ws_messages(client_messages)
             response_record["ws_events"] = response_events
 
         record = {

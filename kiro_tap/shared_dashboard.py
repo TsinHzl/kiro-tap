@@ -201,6 +201,45 @@ def _dashboard_cmd_prefix() -> list[str]:
     return [sys.executable, "-m", "kiro_tap"]
 
 
+def _is_kiro_tap_dashboard_pid(pid: int) -> bool:
+    """Return True only if the PID is a kiro-tap dashboard subprocess.
+
+    Matches on argv *tokens* (not substrings) to avoid false positives such
+    as an unrelated python running inside a path that happens to contain
+    "kiro-tap" (e.g. the pipx venv). The dashboard is spawned as either
+    ``<...>/kiro-tap dashboard ...`` or ``python -m kiro_tap dashboard ...``.
+    """
+    try:
+        import psutil  # type: ignore[import]
+
+        argv = list(psutil.Process(pid).cmdline())
+    except ImportError:
+        try:
+            result = subprocess.run(
+                ["ps", "-p", str(pid), "-o", "command="],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            argv = result.stdout.strip().split()
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+    except Exception:
+        return False
+
+    if not argv:
+        return False
+    # The "dashboard" subcommand must appear as a standalone token.
+    if "dashboard" not in argv:
+        return False
+    # And the executable must be kiro-tap (console script) or `-m kiro_tap`.
+    exe_is_kiro_tap = any(os.path.basename(tok) in ("kiro-tap", "kiro_tap") for tok in argv)
+    module_invocation = any(
+        argv[i] == "-m" and i + 1 < len(argv) and argv[i + 1] == "kiro_tap" for i in range(len(argv))
+    )
+    return exe_is_kiro_tap or module_invocation
+
+
 def _kill_process_on_port(port: int) -> None:
     """Kill any process listening on the given port (best-effort)."""
     import signal
@@ -210,6 +249,8 @@ def _kill_process_on_port(port: int) -> None:
 
         for conn in psutil.net_connections(kind="inet"):
             if conn.laddr.port == port and conn.status == "LISTEN" and conn.pid:
+                if not _is_kiro_tap_dashboard_pid(conn.pid):
+                    continue
                 try:
                     os.kill(conn.pid, signal.SIGTERM)
                 except (ProcessLookupError, PermissionError):
@@ -228,8 +269,14 @@ def _kill_process_on_port(port: int) -> None:
         )
         for pid_str in result.stdout.strip().splitlines():
             try:
-                os.kill(int(pid_str), signal.SIGTERM)
-            except (ValueError, ProcessLookupError, PermissionError):
+                pid = int(pid_str)
+            except ValueError:
+                continue
+            if not _is_kiro_tap_dashboard_pid(pid):
+                continue
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (ProcessLookupError, PermissionError):
                 pass
     except (OSError, subprocess.TimeoutExpired):
         pass

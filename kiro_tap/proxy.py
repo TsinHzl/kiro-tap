@@ -258,11 +258,26 @@ async def proxy_handler(request: web.Request) -> web.StreamResponse:
         )
         return web.Response(status=502, text=str(exc))
 
-    resp_content_type = upstream_resp.headers.get("Content-Type", "")
-    is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
+    try:
+        resp_content_type = upstream_resp.headers.get("Content-Type", "")
+        is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
 
-    if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
-        resp_body = await _handle_streaming(
+        if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
+            return await _handle_streaming(
+                request,
+                upstream_resp,
+                req_id,
+                turn,
+                t0,
+                req_body,
+                writer,
+                log_prefix,
+                upstream_base_url=target,
+                use_aws_reassembler=is_aws_eventstream,
+                store_stream_events=bool(ctx.get("store_stream_events", False)),
+            )
+
+        return await _handle_non_streaming(
             request,
             upstream_resp,
             req_id,
@@ -272,22 +287,9 @@ async def proxy_handler(request: web.Request) -> web.StreamResponse:
             writer,
             log_prefix,
             upstream_base_url=target,
-            use_aws_reassembler=is_aws_eventstream,
-            store_stream_events=bool(ctx.get("store_stream_events", False)),
         )
-        return resp_body
-
-    return await _handle_non_streaming(
-        request,
-        upstream_resp,
-        req_id,
-        turn,
-        t0,
-        req_body,
-        writer,
-        log_prefix,
-        upstream_base_url=target,
-    )
+    finally:
+        upstream_resp.close()
 
 
 async def _handle_streaming(
@@ -305,7 +307,11 @@ async def _handle_streaming(
 ) -> web.StreamResponse:
     resp = web.StreamResponse(
         status=upstream_resp.status,
-        headers={k: v for k, v in upstream_resp.headers.items() if k.lower() not in HOP_BY_HOP},
+        headers={
+            k: v
+            for k, v in upstream_resp.headers.items()
+            if k.lower() not in HOP_BY_HOP and k.lower() != "content-length"
+        },
     )
     await resp.prepare(request)
 
