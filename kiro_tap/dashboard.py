@@ -657,6 +657,16 @@ def _request_user_text(body: Any) -> str:
     if not isinstance(body, dict):
         return ""
 
+    conversation_state = body.get("conversationState")
+    if isinstance(conversation_state, dict):
+        current = conversation_state.get("currentMessage")
+        if isinstance(current, dict):
+            uim = current.get("userInputMessage")
+            if isinstance(uim, dict):
+                prompt = _kiro_user_text(uim.get("content"))
+                if prompt:
+                    return prompt
+
     messages = body.get("messages")
     if isinstance(messages, list):
         for message in messages:
@@ -765,6 +775,25 @@ def _clean_user_prompt_text(text: str) -> str:
         return ""
 
     return text
+
+
+_KIRO_USER_MSG_RE = re.compile(
+    r"---\s*USER MESSAGE BEGIN\s*---\s*(.*?)\s*---\s*USER MESSAGE END\s*---",
+    re.DOTALL | re.IGNORECASE,
+)
+_KIRO_CONTEXT_RE = re.compile(
+    r"---\s*CONTEXT ENTRY BEGIN\s*---.*?---\s*CONTEXT ENTRY END\s*---",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def _kiro_user_text(content: Any) -> str:
+    if not isinstance(content, str) or not content:
+        return ""
+    blocks = _KIRO_USER_MSG_RE.findall(content)
+    if blocks:
+        return blocks[-1].strip()
+    return _KIRO_CONTEXT_RE.sub("", content).strip()
 
 
 def _response_text(body: Any) -> str:
