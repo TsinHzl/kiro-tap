@@ -127,12 +127,6 @@ button { cursor: pointer; }
 .live-status::before {
   content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor;
 }
-.theme-toggle {
-  background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  padding: 4px 8px; color: var(--text-secondary); display: flex; align-items: center;
-  transition: all .15s; font-size: 14px; line-height: 1;
-}
-.theme-toggle:hover { border-color: var(--primary); color: var(--primary); }
 .lang-select {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 4px 8px; color: var(--text-secondary); transition: all .15s;
@@ -676,13 +670,13 @@ body.detail-route .detail-inspector-bar {
 .msg.user .msg-role--history { background: var(--primary); }
 .msg.assistant .msg-role--history { background: var(--green); }
 .section--telemetry { opacity: 0.85; }
-.section--telemetry .section-header .title { color: var(--text-muted); }
+.section--telemetry .section-header .title { color: var(--text-tertiary); }
 .record-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
-.record-table th { text-align: left; padding: 5px 10px; background: var(--bg-code); color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.record-table th { text-align: left; padding: 5px 10px; background: var(--bg-code); color: var(--text-tertiary); font-weight: 600; border-bottom: 1px solid var(--border); }
 .record-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); word-break: break-all; }
 .record-table tr:last-child td { border-bottom: none; }
 .record-table--compact td { padding: 3px 10px; }
-.tele-key { color: var(--text-muted); font-family: var(--mono); width: 220px; }
+.tele-key { color: var(--text-tertiary); font-family: var(--mono); width: 220px; }
 .tele-val { font-family: var(--mono); }
 .content-block { margin-top: 8px; white-space: pre-wrap; word-break: break-word; }
 .content-block:first-child { margin-top: 0; }
@@ -889,7 +883,6 @@ const DASHBOARD_I18N = {
     live_watching: "Watching",
     live_polling: "Polling",
     live_reconnecting: "Reconnecting",
-    theme_toggle: "Toggle dark mode",
     language: "Language",
     dashboard: "Dashboard",
     trace_history_sessions: "trace history sessions",
@@ -970,7 +963,6 @@ const DASHBOARD_I18N = {
     live_watching: "监听中",
     live_polling: "轮询中",
     live_reconnecting: "重连中",
-    theme_toggle: "切换深色模式",
     language: "语言",
     dashboard: "面板",
     trace_history_sessions: "trace 历史会话",
@@ -1773,10 +1765,10 @@ function responseTextFromBody(body) {
   const direct = contentText(body.content);
   if (direct) return direct;
   if (Array.isArray(body.candidates)) {
-    return body.candidates.map(candidate => partsText(candidate?.content?.parts)).filter(Boolean).join("\\n");
+    return body.candidates.map(candidate => partsText(candidate?.content?.parts)).filter(Boolean).join("\n");
   }
   if (Array.isArray(body.choices)) {
-    return body.choices.map(choice => contentText(choice?.message?.content || choice?.delta?.content)).filter(Boolean).join("\\n");
+    return body.choices.map(choice => contentText(choice?.message?.content || choice?.delta?.content)).filter(Boolean).join("\n");
   }
   const output = contentText(body.output);
   if (output) return output;
@@ -1804,7 +1796,7 @@ function contentText(value) {
       if (typeof item === "string") return item;
       if (!item || typeof item !== "object") return "";
       return contentText(item.text || item.content || item.output_text || "");
-    }).filter(Boolean).join("\\n");
+    }).filter(Boolean).join("\n");
   }
   if (value && typeof value === "object") {
     return contentText(value.text || value.content || value.output_text || "");
@@ -1814,7 +1806,7 @@ function contentText(value) {
 
 function partsText(parts) {
   if (!Array.isArray(parts)) return "";
-  return parts.map(part => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\\n");
+  return parts.map(part => typeof part?.text === "string" ? part.text : "").filter(Boolean).join("\n");
 }
 
 function connectEvents() {
@@ -1843,28 +1835,6 @@ function connectEvents() {
   events.addEventListener("error", () => {
     $("#live-label").textContent = t("live_reconnecting");
   });
-}
-
-function initTheme() {
-  const saved = localStorage.getItem("kiro-tap-theme");
-  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  applyTheme(saved || (prefersDark ? "dark" : "light"));
-}
-
-function toggleTheme() {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  localStorage.setItem("kiro-tap-theme", next);
-  applyTheme(next);
-}
-
-function applyTheme(theme) {
-  if (theme === "dark") {
-    document.documentElement.dataset.theme = "dark";
-    $("#theme-toggle").textContent = "\u2600";
-  } else {
-    delete document.documentElement.dataset.theme;
-    $("#theme-toggle").textContent = "\u263E";
-  }
 }
 
 $("#search").addEventListener("input", event => {
