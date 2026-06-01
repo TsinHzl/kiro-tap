@@ -41,7 +41,10 @@ class TraceWriter:
             if self._metadata:
                 capture = record.get("capture") if isinstance(record.get("capture"), dict) else {}
                 record["capture"] = {**self._metadata, **capture}
-            self._store.append_record(self.session_id, record)
+            # Run the blocking SQLite write in a thread-pool executor so it
+            # does not block the event loop on every captured request.
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._store.append_record, self.session_id, record)
             self.count += 1
             self._update_stats(record)
 

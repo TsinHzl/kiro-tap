@@ -7,12 +7,11 @@ import json
 import re
 import tempfile
 from datetime import date
+from importlib.metadata import version as _pkg_version
 from pathlib import Path
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 from aiohttp import web
-
-from importlib.metadata import version as _pkg_version
 
 from kiro_tap.dashboard import (
     dashboard_trace_snapshot,
@@ -27,6 +26,31 @@ from kiro_tap.trace_store import get_trace_store, resolve_db_path
 from kiro_tap.viewer import VIEWER_SCRIPT_ANCHOR, VIEWER_TEMPLATE_PATH, _generate_html_viewer, _read_viewer_template
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _is_same_origin(request: web.Request) -> bool:
+    """Return True if the request is same-origin or from a non-browser client.
+
+    Blocks requests where the browser explicitly signals a cross-site origin
+    (Sec-Fetch-Site: cross-site, or Origin header that doesn't match Host).
+    Requests with no Origin and no Sec-Fetch-Site (e.g. curl, CLI tools) are
+    allowed through so local scripts remain functional.
+    """
+    sec_fetch_site = request.headers.get("Sec-Fetch-Site", "")
+    if sec_fetch_site == "cross-site":
+        return False
+    if sec_fetch_site in ("same-origin", "same-site", "none"):
+        return True
+    # No Sec-Fetch-Site — fall back to Origin header check
+    origin = request.headers.get("Origin", "")
+    if not origin:
+        # No Origin header: non-browser client (curl, CLI) — allow
+        return True
+    host = request.headers.get("Host", "")
+    # Compare scheme+host of Origin against Host header
+    parsed = urlparse(origin)
+    origin_host = parsed.netloc or parsed.path
+    return origin_host == host
 
 
 def _record_limit_from_request(request: web.Request) -> int | None:
@@ -159,14 +183,15 @@ class LiveViewerServer:
         message = f"data: {data}\n\n"
 
         disconnected = []
-        for client in self._sse_clients:
+        for client in list(self._sse_clients):
             try:
                 await client.write(message.encode("utf-8"))
             except (ConnectionError, ConnectionResetError, Exception):
                 disconnected.append(client)
 
         for client in disconnected:
-            self._sse_clients.remove(client)
+            if client in self._sse_clients:
+                self._sse_clients.remove(client)
 
         await self._broadcast_dashboard_event({"type": "record", "session_id": self.session_id})
 
@@ -232,7 +257,6 @@ class LiveViewerServer:
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
             },
         )
         await resp.prepare(request)
@@ -272,7 +296,6 @@ class LiveViewerServer:
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
             },
         )
         await resp.prepare(request)
@@ -434,7 +457,7 @@ class LiveViewerServer:
         if not self._dashboard_clients:
             return
         disconnected = []
-        for client in self._dashboard_clients:
+        for client in list(self._dashboard_clients):
             try:
                 await self._write_dashboard_event(client, payload)
             except (ConnectionError, ConnectionResetError, RuntimeError, Exception):
@@ -450,6 +473,8 @@ class LiveViewerServer:
 
     async def _handle_delete_traces_by_date(self, request: web.Request) -> web.Response:
         """Delete stored trace sessions for a selected history date."""
+        if not _is_same_origin(request):
+            return web.json_response({"error": "Forbidden: cross-origin request"}, status=403)
         date_key = request.match_info["date"]
         if date_key != "legacy" and not _DATE_RE.match(date_key):
             return web.json_response({"error": "Invalid date format"}, status=400)

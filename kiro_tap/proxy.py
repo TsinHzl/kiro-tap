@@ -324,7 +324,9 @@ async def _handle_streaming(
         async for chunk in upstream_resp.content.iter_any():
             await resp.write(chunk)
             reassembler.feed_bytes(chunk)
-    except (ConnectionError, asyncio.CancelledError):
+    except asyncio.CancelledError:
+        raise
+    except ConnectionError:
         pass
 
     try:

@@ -904,6 +904,13 @@ async def dashboard_main(args: argparse.Namespace) -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     host = args.host
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        print(
+            f"⚠️  SECURITY: binding dashboard to {host} exposes trace history on all interfaces "
+            "with NO authentication. Anyone who can reach this host can read intercepted "
+            "traffic (including request/response bodies) and delete trace history. "
+            "Use 127.0.0.1 unless you fully trust the network."
+        )
     port = resolve_dashboard_port(args.live_port)
     if await _is_dashboard_reusable(host, port):
         migrate_legacy_traces(output_dir)

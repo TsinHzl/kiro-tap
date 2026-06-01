@@ -7,6 +7,14 @@ import json
 
 from kiro_tap.usage import normalize_usage
 
+# Maximum content/tool-call index accepted from untrusted stream data.
+# Prevents OOM from a malicious stream sending a huge index value.
+_MAX_CONTENT_INDEX = 10_000
+
+# Maximum SSE buffer size. If a stream never sends a newline the buffer would
+# grow without bound; reset and warn instead of OOM-ing.
+_MAX_BUF_BYTES = 64 * 1024 * 1024  # 64 MB
+
 
 class SSEReassembler:
     """Parse raw SSE bytes and reconstruct the full API response object
@@ -22,6 +30,16 @@ class SSEReassembler:
 
     def feed_bytes(self, chunk: bytes):
         self._buf += chunk
+        if len(self._buf) > _MAX_BUF_BYTES:
+            import logging
+            logging.getLogger("kiro-tap").warning(
+                "SSEReassembler: buffer exceeded %d bytes, resetting (stream may be malformed)",
+                _MAX_BUF_BYTES,
+            )
+            self._buf = b""
+            self._current_event = None
+            self._current_data_lines = []
+            return
         while b"\n" in self._buf:
             line, self._buf = self._buf.split(b"\n", 1)
             self._feed_line(line.decode("utf-8", errors="replace"))
@@ -93,6 +111,9 @@ class SSEReassembler:
                 if "content" not in self._snapshot:
                     self._snapshot["content"] = []
                 idx = data.get("index", len(self._snapshot["content"]))
+                # Guard against untrusted stream sending a huge index (OOM)
+                if not isinstance(idx, int) or idx > _MAX_CONTENT_INDEX:
+                    return
                 # Extend content list if needed
                 while len(self._snapshot["content"]) <= idx:
                     self._snapshot["content"].append({})
@@ -186,6 +207,9 @@ class SSEReassembler:
                 continue
             idx = tc_delta.get("index", 0)
             tool_calls = msg.setdefault("tool_calls", [])
+            # Guard against untrusted stream sending a huge index (OOM)
+            if not isinstance(idx, int) or idx > _MAX_CONTENT_INDEX:
+                continue
             while len(tool_calls) <= idx:
                 tool_calls.append({"id": "", "type": "function", "function": {"name": "", "arguments": ""}})
             existing = tool_calls[idx]
@@ -221,6 +245,9 @@ class SSEReassembler:
         content = self._snapshot["content"]
         offset = 1 + (1 if self._chat_completion_thinking_block(create=False) is not None else 0)
         target = idx + offset
+        # Guard against untrusted stream sending a huge index (OOM)
+        if target > _MAX_CONTENT_INDEX:
+            return
         while len(content) <= target:
             content.append({"type": "tool_use", "id": "", "name": "", "input": {}})
         block = content[target]

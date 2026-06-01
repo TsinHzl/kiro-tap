@@ -51,6 +51,10 @@ from kiro_tap.ws_proxy import (
 
 log = logging.getLogger("kiro-tap")
 
+# Maximum body size for plain-HTTP proxy requests. Requests exceeding this
+# limit are rejected to prevent memory exhaustion from malicious clients.
+_MAX_BODY_BYTES = 256 * 1024 * 1024  # 256 MB
+
 
 def _matches_path_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
     clean = path.split("?", 1)[0].rstrip("/")
@@ -61,6 +65,7 @@ def _matches_path_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
 
 async def _read_chunked_body(reader: asyncio.StreamReader) -> bytes:
     chunks: list[bytes] = []
+    total = 0
     while True:
         size_line = await asyncio.wait_for(reader.readline(), timeout=60)
         if not size_line:
@@ -76,6 +81,9 @@ async def _read_chunked_body(reader: asyncio.StreamReader) -> bytes:
                 if trailer_line in (b"\r\n", b"\n", b""):
                     break
             break
+        total += size
+        if total > _MAX_BODY_BYTES:
+            raise ValueError(f"Chunked body exceeds maximum size of {_MAX_BODY_BYTES} bytes")
         chunks.append(await asyncio.wait_for(reader.readexactly(size), timeout=60))
         await asyncio.wait_for(reader.readexactly(2), timeout=30)
     return b"".join(chunks)
@@ -86,8 +94,13 @@ async def _read_http_body(reader: asyncio.StreamReader, headers: dict[str, str])
     if content_length:
         try:
             length = int(content_length)
+        except ValueError:
+            return b""
+        if length > _MAX_BODY_BYTES:
+            raise ValueError(f"Content-Length {length} exceeds maximum size of {_MAX_BODY_BYTES} bytes")
+        try:
             return await asyncio.wait_for(reader.readexactly(length), timeout=60)
-        except (ValueError, asyncio.IncompleteReadError, asyncio.TimeoutError):
+        except (asyncio.IncompleteReadError, asyncio.TimeoutError):
             return b""
     transfer_encoding = headers.get("Transfer-Encoding") or headers.get("transfer-encoding", "")
     if "chunked" in transfer_encoding.lower():
@@ -582,7 +595,9 @@ class ForwardProxyServer:
                 client_writer.write(chunk_header + chunk + b"\r\n")
                 await client_writer.drain()
                 reassembler.feed_bytes(chunk)
-        except (ConnectionError, asyncio.CancelledError):
+        except asyncio.CancelledError:
+            raise
+        except ConnectionError:
             pass
 
         # Send final chunk
@@ -939,6 +954,24 @@ class ForwardProxyServer:
         ):
             upstream_url = self._local_reverse_target.rstrip("/") + "/" + path.lstrip("/")
             await self._forward_and_record(method, path, headers, body, upstream_url, writer)
+            return
+
+        # Reject open-proxy requests: absolute URLs with a scheme (e.g. GET http://example.com/)
+        # are not allowlisted — return 403 to prevent SSRF / open relay abuse.
+        if parsed.scheme:
+            log.warning(f"Blocked plain-proxy request to {url!r} (not in allowlist)")
+            error_body = b"Forbidden: open proxy requests are not allowed\r\n"
+            writer.write(
+                b"HTTP/1.1 403 Forbidden\r\n"
+                b"Content-Type: text/plain\r\n"
+                + f"Content-Length: {len(error_body)}\r\n".encode()
+                + b"Connection: close\r\n\r\n"
+                + error_body
+            )
+            try:
+                await writer.drain()
+            except (ConnectionError, OSError):
+                pass
             return
 
         await self._forward_and_record(method, path, headers, body, url, writer)

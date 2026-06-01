@@ -6,15 +6,11 @@ import json
 import struct
 import zlib
 
-import pytest
-
 from kiro_tap.aws_event_stream import (  # noqa: E402
     AWSEventStreamReassembler,
-    Frame,
     iter_frames,
     parse_frame,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helper: build a valid AWS Event Stream frame

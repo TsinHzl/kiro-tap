@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from kiro_tap.proxy import _is_allowed_path
 
 
