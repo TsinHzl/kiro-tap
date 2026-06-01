@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import ipaddress
 import logging
+import os
 import ssl
 import subprocess
 from pathlib import Path
@@ -40,7 +41,9 @@ def ensure_ca(ca_dir: Path | None = None) -> tuple[Path, Path]:
     Returns (ca_cert_path, ca_key_path). Creates them if they don't exist.
     """
     ca_dir = ca_dir or _DEFAULT_CA_DIR
-    ca_dir.mkdir(parents=True, exist_ok=True)
+    ca_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Ensure correct permissions even if directory already existed
+    ca_dir.chmod(0o700)
 
     ca_cert_path = ca_dir / "ca.pem"
     ca_key_path = ca_dir / "ca-key.pem"
@@ -93,15 +96,17 @@ def ensure_ca(ca_dir: Path | None = None) -> tuple[Path, Path]:
         .sign(key, hashes.SHA256())
     )
 
-    ca_key_path.write_bytes(
-        key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        )
+    # Write private key with atomic 0o600 permissions (no umask window)
+    key_bytes = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
     )
-    # Restrict key file permissions
-    ca_key_path.chmod(0o600)
+    fd = os.open(str(ca_key_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        os.write(fd, key_bytes)
+    finally:
+        os.close(fd)
 
     ca_cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
 
@@ -189,6 +194,7 @@ class CertificateAuthority:
     def __init__(self, ca_cert_path: Path, ca_key_path: Path) -> None:
         self._ca_cert, self._ca_key = _load_ca(ca_cert_path, ca_key_path)
         self._host_cache: dict[str, tuple[bytes, bytes]] = {}
+        self._ssl_ctx_cache: dict[str, ssl.SSLContext] = {}
 
     def get_host_cert_pem(self, hostname: str) -> tuple[bytes, bytes]:
         """Return (cert_pem, key_pem) for the given hostname.
@@ -254,8 +260,16 @@ class CertificateAuthority:
         return cert_pem, key_pem
 
     def make_ssl_context(self, hostname: str) -> ssl.SSLContext:
-        """Create an SSL context for serving TLS as the given hostname."""
+        """Create an SSL context for serving TLS as the given hostname.
+
+        Contexts are cached per hostname for the process lifetime, so the
+        private key is written to a temp file at most once per host.
+        """
         import tempfile
+
+        cached = self._ssl_ctx_cache.get(hostname)
+        if cached is not None:
+            return cached
 
         cert_pem, key_pem = self.get_host_cert_pem(hostname)
 
@@ -274,4 +288,5 @@ class CertificateAuthority:
             Path(cert_path).unlink(missing_ok=True)
             Path(key_path).unlink(missing_ok=True)
 
+        self._ssl_ctx_cache[hostname] = ctx
         return ctx

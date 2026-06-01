@@ -26,7 +26,6 @@ import zlib
 from dataclasses import dataclass, field
 from typing import Iterator
 
-
 # ---------------------------------------------------------------------------
 # CRC32 (ISO-HDLC / Ethernet / ZIP standard, same as AWS Event Stream)
 # ---------------------------------------------------------------------------
@@ -53,6 +52,9 @@ _HEADER_TYPE_UUID = 9
 PRELUDE_SIZE = 12  # total_len(4) + header_len(4) + prelude_crc(4)
 MIN_MESSAGE_SIZE = PRELUDE_SIZE + 4  # + message_crc(4)
 MAX_MESSAGE_SIZE = 16 * 1024 * 1024  # 16 MB
+# Maximum reassembly buffer size. Prevents OOM if the stream never delivers a
+# complete frame (e.g. malformed or adversarial input).
+_MAX_BUF_BYTES = 64 * 1024 * 1024  # 64 MB
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +287,14 @@ class AWSEventStreamReassembler:
 
     def feed_bytes(self, chunk: bytes) -> None:
         self._buf += chunk
+        if len(self._buf) > _MAX_BUF_BYTES:
+            import logging
+            logging.getLogger("kiro-tap").warning(
+                "AWSEventStreamReassembler: buffer exceeded %d bytes, resetting (stream may be malformed)",
+                _MAX_BUF_BYTES,
+            )
+            self._buf = b""
+            return
         self._drain()
 
     def _drain(self) -> None:
@@ -298,7 +308,10 @@ class AWSEventStreamReassembler:
             if result is None:
                 break
             frame, consumed = result
-            self._process_frame(frame)
+            try:
+                self._process_frame(frame)
+            except Exception:
+                pass
             offset += consumed
         self._buf = self._buf[offset:]
 
@@ -367,9 +380,9 @@ class AWSEventStreamReassembler:
             cache_read = payload.get("cacheReadInputTokens")
             cache_create = payload.get("cacheCreationInputTokens")
             if cache_read is not None:
-                self._metering["cache_read_input_tokens"] = int(cache_read)
+                self._metering["cache_read_input_tokens"] = int(cache_read) if isinstance(cache_read, (int, float)) else 0
             if cache_create is not None:
-                self._metering["cache_creation_input_tokens"] = int(cache_create)
+                self._metering["cache_creation_input_tokens"] = int(cache_create) if isinstance(cache_create, (int, float)) else 0
 
         elif event_type == EVENT_TYPE_CONTEXT_USAGE:
             pct = payload.get("contextUsagePercentage", 0)

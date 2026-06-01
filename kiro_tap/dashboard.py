@@ -300,7 +300,6 @@ def _summarize_session(
     agent = _infer_agent(records, manifest_entry)
     input_tokens = output_tokens = cache_read_tokens = cache_create_tokens = 0
     models: dict[str, int] = {}
-    statuses: list[int] = []
     duration_ms = 0
     turns: set[int] = set()
 
@@ -313,16 +312,19 @@ def _summarize_session(
         model = _record_model(record)
         if model:
             models[model] = models.get(model, 0) + 1
-        status_code = _response_status(record)
-        if status_code:
-            statuses.append(status_code)
         duration_ms += _duration_ms(record)
         turn = record.get("turn")
         if isinstance(turn, int):
             turns.add(turn)
 
-    has_error = any(code >= 400 for code in statuses) or any(_record_error(record) for record in records)
-    if has_error:
+    # Status reflects the LAST record (last-record-wins), matching the
+    # incremental merge_record_into_summary path. A later success clears an
+    # earlier error; the first error is still retained in the "error" field.
+    last_record = records[-1] if records else None
+    last_failed = bool(last_record) and (
+        _response_status(last_record) >= 400 or bool(_record_error(last_record))
+    )
+    if last_failed:
         resolved_status = "error"
     elif is_current and records:
         resolved_status = "active"

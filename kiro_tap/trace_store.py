@@ -61,7 +61,7 @@ class TraceStore:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._schema_ready = False
         self._schema_lock = threading.Lock()
-        self._write_lock = threading.Lock()
+        self._write_lock = threading.RLock()  # RLock: allows re-entry from log handler emit path
         self._tls = threading.local()
 
     def create_session(

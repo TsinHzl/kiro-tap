@@ -44,11 +44,16 @@ from kiro_tap.trace import TraceWriter
 from kiro_tap.usage import normalize_usage
 from kiro_tap.ws_proxy import (
     _get_ws_proxy_settings,
+    _parse_ws_messages,
     reconstruct_ws_request_body,
     reconstruct_ws_response_body,
 )
 
 log = logging.getLogger("kiro-tap")
+
+# Maximum body size for plain-HTTP proxy requests. Requests exceeding this
+# limit are rejected to prevent memory exhaustion from malicious clients.
+_MAX_BODY_BYTES = 256 * 1024 * 1024  # 256 MB
 
 
 def _matches_path_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
@@ -60,6 +65,7 @@ def _matches_path_prefix(path: str, prefixes: tuple[str, ...]) -> bool:
 
 async def _read_chunked_body(reader: asyncio.StreamReader) -> bytes:
     chunks: list[bytes] = []
+    total = 0
     while True:
         size_line = await asyncio.wait_for(reader.readline(), timeout=60)
         if not size_line:
@@ -75,6 +81,9 @@ async def _read_chunked_body(reader: asyncio.StreamReader) -> bytes:
                 if trailer_line in (b"\r\n", b"\n", b""):
                     break
             break
+        total += size
+        if total > _MAX_BODY_BYTES:
+            raise ValueError(f"Chunked body exceeds maximum size of {_MAX_BODY_BYTES} bytes")
         chunks.append(await asyncio.wait_for(reader.readexactly(size), timeout=60))
         await asyncio.wait_for(reader.readexactly(2), timeout=30)
     return b"".join(chunks)
@@ -85,8 +94,13 @@ async def _read_http_body(reader: asyncio.StreamReader, headers: dict[str, str])
     if content_length:
         try:
             length = int(content_length)
+        except ValueError:
+            return b""
+        if length > _MAX_BODY_BYTES:
+            raise ValueError(f"Content-Length {length} exceeds maximum size of {_MAX_BODY_BYTES} bytes")
+        try:
             return await asyncio.wait_for(reader.readexactly(length), timeout=60)
-        except (ValueError, asyncio.IncompleteReadError, asyncio.TimeoutError):
+        except (asyncio.IncompleteReadError, asyncio.TimeoutError):
             return b""
     transfer_encoding = headers.get("Transfer-Encoding") or headers.get("transfer-encoding", "")
     if "chunked" in transfer_encoding.lower():
@@ -508,35 +522,38 @@ class ForwardProxyServer:
             await client_writer.drain()
             return
 
-        resp_content_type = upstream_resp.headers.get("Content-Type", "")
-        is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
+        try:
+            resp_content_type = upstream_resp.headers.get("Content-Type", "")
+            is_aws_eventstream = "application/vnd.amazon.eventstream" in resp_content_type
 
-        if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
-            await self._handle_streaming(
-                upstream_resp,
-                client_writer,
-                req_id,
-                turn,
-                t0,
-                method,
-                path,
-                headers,
-                req_body,
-                log_prefix,
-            )
-        else:
-            await self._handle_non_streaming(
-                upstream_resp,
-                client_writer,
-                req_id,
-                turn,
-                t0,
-                method,
-                path,
-                headers,
-                req_body,
-                log_prefix,
-            )
+            if (is_streaming or is_aws_eventstream) and upstream_resp.status == 200:
+                await self._handle_streaming(
+                    upstream_resp,
+                    client_writer,
+                    req_id,
+                    turn,
+                    t0,
+                    method,
+                    path,
+                    headers,
+                    req_body,
+                    log_prefix,
+                )
+            else:
+                await self._handle_non_streaming(
+                    upstream_resp,
+                    client_writer,
+                    req_id,
+                    turn,
+                    t0,
+                    method,
+                    path,
+                    headers,
+                    req_body,
+                    log_prefix,
+                )
+        finally:
+            upstream_resp.close()
 
     async def _handle_streaming(
         self,
@@ -556,9 +573,10 @@ class ForwardProxyServer:
         status_line = f"HTTP/1.1 {upstream_resp.status} {upstream_resp.reason}\r\n"
         client_writer.write(status_line.encode())
 
-        # Send response headers (filter hop-by-hop, use chunked transfer)
+        # Send response headers (filter hop-by-hop, drop upstream Content-Length
+        # since we re-frame the body as chunked — RFC 7230 forbids both together).
         for key, value in upstream_resp.headers.items():
-            if key.lower() not in HOP_BY_HOP:
+            if key.lower() not in HOP_BY_HOP and key.lower() != "content-length":
                 client_writer.write(f"{key}: {value}\r\n".encode())
         client_writer.write(b"Transfer-Encoding: chunked\r\n")
         client_writer.write(b"\r\n")
@@ -577,7 +595,9 @@ class ForwardProxyServer:
                 client_writer.write(chunk_header + chunk + b"\r\n")
                 await client_writer.drain()
                 reassembler.feed_bytes(chunk)
-        except (ConnectionError, asyncio.CancelledError):
+        except asyncio.CancelledError:
+            raise
+        except ConnectionError:
             pass
 
         # Send final chunk
@@ -871,16 +891,14 @@ class ForwardProxyServer:
             "headers": filter_headers(headers, redact_keys=True),
             "body": reconstruct_ws_request_body(client_messages),
         }
-        response_events = [json.loads(msg) if msg.startswith("{") else {"raw": msg} for msg in server_messages]
+        response_events = _parse_ws_messages(server_messages)
         response_record = {
             "status": 101,
             "headers": {},
             "body": reconstruct_ws_response_body(response_events),
         }
         if self._store_stream_events:
-            request_record["ws_events"] = [
-                json.loads(msg) if msg.startswith("{") else {"raw": msg} for msg in client_messages
-            ]
+            request_record["ws_events"] = _parse_ws_messages(client_messages)
             response_record["ws_events"] = response_events
 
         record = {
@@ -938,4 +956,35 @@ class ForwardProxyServer:
             await self._forward_and_record(method, path, headers, body, upstream_url, writer)
             return
 
-        await self._forward_and_record(method, path, headers, body, url, writer)
+        # Reject open-proxy requests: absolute URLs with a scheme (e.g. GET http://example.com/)
+        # are not allowlisted — return 403 to prevent SSRF / open relay abuse.
+        if parsed.scheme:
+            log.warning(f"Blocked plain-proxy request to {url!r} (not in allowlist)")
+            error_body = b"Forbidden: open proxy requests are not allowed\r\n"
+            writer.write(
+                b"HTTP/1.1 403 Forbidden\r\n"
+                b"Content-Type: text/plain\r\n"
+                + f"Content-Length: {len(error_body)}\r\n".encode()
+                + b"Connection: close\r\n\r\n"
+                + error_body
+            )
+            try:
+                await writer.drain()
+            except (ConnectionError, OSError):
+                pass
+            return
+
+        # scheme-less path with no matching local reverse target — nothing to forward to
+        log.warning(f"Unroutable plain-proxy request to {url!r} (no local reverse target)")
+        error_body = b"Bad Request: no upstream target configured for this path\r\n"
+        writer.write(
+            b"HTTP/1.1 400 Bad Request\r\n"
+            b"Content-Type: text/plain\r\n"
+            + f"Content-Length: {len(error_body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + error_body
+        )
+        try:
+            await writer.drain()
+        except (ConnectionError, OSError):
+            pass
