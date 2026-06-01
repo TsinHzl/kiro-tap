@@ -974,4 +974,17 @@ class ForwardProxyServer:
                 pass
             return
 
-        await self._forward_and_record(method, path, headers, body, url, writer)
+        # scheme-less path with no matching local reverse target — nothing to forward to
+        log.warning(f"Unroutable plain-proxy request to {url!r} (no local reverse target)")
+        error_body = b"Bad Request: no upstream target configured for this path\r\n"
+        writer.write(
+            b"HTTP/1.1 400 Bad Request\r\n"
+            b"Content-Type: text/plain\r\n"
+            + f"Content-Length: {len(error_body)}\r\n".encode()
+            + b"Connection: close\r\n\r\n"
+            + error_body
+        )
+        try:
+            await writer.drain()
+        except (ConnectionError, OSError):
+            pass

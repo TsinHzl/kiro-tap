@@ -2803,7 +2803,7 @@ function renderToolFilter() {
   tf.innerHTML = '<div style="margin-bottom:3px;font-weight:600;color:var(--text-secondary)">Tools</div>' +
     tools.map(name => {
       const active = activeTools ? activeTools.has(name) : false;
-      return `<button class="filter-chip${active ? ' active' : ''}" style="font-size:10px;padding:2px 6px;margin:1px" onclick="toggleToolFilter('${name.replace(/'/g, "\\'")}')">${name}</button>`;
+      return `<button class="filter-chip${active ? ' active' : ''}" style="font-size:10px;padding:2px 6px;margin:1px" onclick="toggleToolFilter('${esc(name).replace(/'/g, "&#39;")}')">${esc(name)}</button>`;
     }).join('') +
     (activeTools ? `<button class="filter-chip" style="font-size:10px;padding:2px 6px;margin:1px;color:var(--red)" onclick="clearToolFilter()">✕ Clear</button>` : '');
 }
