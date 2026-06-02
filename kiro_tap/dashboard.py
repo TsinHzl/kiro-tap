@@ -400,6 +400,8 @@ def _record_usage(record: dict[str, Any]) -> dict[str, int]:
 
 
 def _record_model(record: dict[str, Any]) -> str:
+    if not record:
+        return ""
     request = record.get("request")
     req_body = request.get("body") if isinstance(request, dict) else None
     if isinstance(req_body, dict):
