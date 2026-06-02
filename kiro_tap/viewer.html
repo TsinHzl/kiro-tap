@@ -1183,6 +1183,7 @@ body.standalone .back-to-dashboard { display: inline-flex; }
   cursor: pointer; font-family: var(--sans); outline: none; margin-left: 8px;
 }
 .lang-select:hover { border-color: var(--primary); }
+body:not(.standalone) .lang-select { display: none; }
 
 /* ─── RTL support ─── */
 [dir="rtl"] #sidebar-wrap { border-right: none; border-left: 1px solid var(--border); }
