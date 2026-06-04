@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `kiro-tap` is a Python CLI tool (published to PyPI) that intercepts Kiro CLI / Kiro IDE HTTPS traffic via a local proxy. It parses AWS Event Stream binary frames, persists traces to SQLite, and serves a real-time browser dashboard over SSE.
 
+**代码索引**：`kiro-tap_源码全景解析.md` — 功能→文件:行号速查表，80+ 函数定位，含架构图和数据流。
+
 ## Commands
 
 ```bash
