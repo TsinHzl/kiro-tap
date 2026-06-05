@@ -1,0 +1,35 @@
+# openspec/config.yaml
+# 由 /opsx:init 自动生成。可手动编辑以调整约束注入内容。
+# context 和 rules 在所有 OpenSpec artifact 生成步骤中作为约束条件注入，
+# 不是模板内容，不得直接复制到 artifact 输出文件中。
+
+schema: spec-driven
+
+context: |
+  Tech stack: Python 3.11+, aiohttp 3.9–4, cryptography 42+, backports-zstd
+  Package manager: pip / uv / pipx；打包工具 setuptools + setuptools-scm（版本从 git tag 派生）
+  Architecture: asyncio 事件循环驱动；双代理模式（Forward：原始 TCP + HTTP CONNECT + TLS 终止 + 本地 CA；Reverse：aiohttp web app + KIRO_BASE_URL 重定向）；TraceStore SQLite 单例（线程池 offload 写入，RLock 保护）；SSE 实时推送到浏览器 Dashboard；前端为纯内联 HTML/CSS/JS，无构建工具
+  Source layout: kiro_tap/（主包，15 个模块）、tests/（pytest）、openspec/（规范工作流）、docs/
+  Test framework: pytest 8+ + pytest-asyncio（asyncio_mode=auto）+ pexpect；KIROTAP_DB env var + reset_trace_store() 隔离 SQLite；--run-real-e2e 标志门控真实 E2E
+  Target platform: macOS / Linux / Windows CLI；浏览器 Dashboard 通过 localhost 访问
+  Min deployment target: Python 3.11
+
+rules:
+  specs:
+    - 每条需求须关联具体模块和函数（如 proxy.py:ALLOWED_PATH_PREFIXES、trace_store.py:TraceStore.__init__），避免泛化描述
+    - 涉及 AWS Event Stream 协议的需求必须标注 CRC32 验证影响、帧格式字段变化范围
+    - 安全相关需求（header 脱敏、路径 allowlist、CA 目录权限）须独立 Scenario，不与功能需求混写
+    - 跨越 asyncio 事件循环与 SQLite 线程池边界的场景须明确说明线程安全约束
+    - 前端（dashboard.html / viewer.html）需求须说明 DOM 结构或 SSE 事件格式变化
+  tasks:
+    - 每个任务须能通过 pytest 或 ruff check . 独立验证；无法自动验证的需明确手动验证步骤（如浏览器截图描述）
+    - 涉及 TraceStore 的任务须包含 KIROTAP_DB 环境变量隔离和 reset_trace_store() 清理步骤
+    - 前端改动（dashboard.html / viewer.html）须说明手动浏览器验证场景，因项目无自动化 UI 测试
+    - lint 修复（ruff --fix）须单独列为一个任务，且排在功能任务之后、最终验证任务之前
+    - 涉及 pyproject.toml 依赖变更的任务须注明对 .venv 和 .venv-test 两个虚拟环境的影响
+  design:
+    - 新功能默认复用现有 aiohttp 路由（live.py / proxy.py），不引入新 web 框架
+    - 所有 SQLite 写入必须通过 TraceStore API（run_in_executor 线程池），严禁在事件循环中直接调用 sqlite3
+    - 敏感 header 脱敏逻辑集中在 proxy.py，不分散到其他模块
+    - 前端保持零构建工具原则：纯内联 HTML/CSS/JS，不引入 npm / webpack / vite / tailwind
+    - 新 CLI 参数须遵循 --tap-* 命名空间，通过 parse_known_args 隔离，不污染透传给 kiro 的参数
