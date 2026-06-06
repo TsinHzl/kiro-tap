@@ -288,5 +288,6 @@ class CertificateAuthority:
             Path(cert_path).unlink(missing_ok=True)
             Path(key_path).unlink(missing_ok=True)
 
+        ctx.set_alpn_protocols(["http/1.1"])
         self._ssl_ctx_cache[hostname] = ctx
         return ctx
