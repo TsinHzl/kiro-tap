@@ -19,7 +19,10 @@ import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 
+import ssl
+
 import aiohttp
+import certifi
 from aiohttp import web
 
 from kiro_tap.certs import CertificateAuthority, ensure_ca, is_macos_ca_trusted, trust_macos_ca
@@ -506,7 +509,9 @@ async def async_main(args: argparse.Namespace):
     # Honor system proxy env (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY) for
     # outbound upstream requests. This is important when users route traffic
     # through tools like Clash/VPN.
-    session = aiohttp.ClientSession(auto_decompress=False, trust_env=True)
+    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+    connector = aiohttp.TCPConnector(ssl=ssl_ctx)
+    session = aiohttp.ClientSession(auto_decompress=False, trust_env=True, connector=connector)
 
     # Forward proxy mode: raw TCP server with CONNECT/TLS termination
     # Reverse proxy mode: aiohttp web app (current behavior)
