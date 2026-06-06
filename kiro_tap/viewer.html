@@ -3958,6 +3958,8 @@ function renderDetail(e) {
   if (reqBody?.conversationState && respOutput?.content) {
     msgs.push({role: 'assistant', content: respOutput.content});
   }
+  const historyMsgs = msgs.filter(m => m.isHistory);
+  const currentMsgs = msgs.filter(m => !m.isHistory);
   const contextOnly = shouldRenderRequestContext(e, reqBody, msgs, respOutput);
   const streamEvents = getResponseEvents(e);
   html += renderDetailViewTabs();
@@ -3972,8 +3974,12 @@ function renderDetail(e) {
       ? section(t('section_tools'), renderTools(tools), false, null, tools.length + ' ' + t('badge_tools'))
       : '';
     const systemSection = sysPrompt ? section(t('section_system'), renderSystemPrompt(sysBlocks, sysPrompt), true, sysPrompt) : '';
-    const messagesSection = msgs && msgs.length
-      ? section(contextOnly ? t('section_context') : t('section_messages'), renderMessages(msgs), true, null, msgs.length + ' ' + t('badge_messages'))
+    const historySection = historyMsgs.length
+      ? section(t('section_history'), renderMessages(historyMsgs.map(m => ({...m, isHistory: false}))), false, null, historyMsgs.length + ' ' + t('badge_messages'))
+      : '';
+    const displayMsgs = historyMsgs.length ? currentMsgs : msgs;
+    const messagesSection = displayMsgs.length
+      ? section(contextOnly ? t('section_context') : t('section_messages'), renderMessages(displayMsgs), true, null, displayMsgs.length + ' ' + t('badge_messages'))
       : '';
     const responseSection = respOutput?.content && !reqBody?.conversationState || contextOnly
       ? section(t('section_response'), renderResponseContent(respOutput, contextOnly), true)
@@ -3990,7 +3996,7 @@ function renderDetail(e) {
     } else if (amzTarget === 'SendTelemetryEvent') {
       html += renderViewerTelemetrySection(e);
     } else {
-      html += toolsSection + systemSection + messagesSection + responseSection;
+      html += toolsSection + systemSection + historySection + messagesSection + responseSection;
       if (streamEvents.length) html += streamSection;
     }
     html += jsonSection;
@@ -4562,7 +4568,7 @@ function getMessages(body) {
         if (item.userInputMessage) {
           msgs.push(...parseKiroUserContent(item.userInputMessage.content, true));
         }
-        if (item.assistantResponseMessage) msgs.push({role: 'assistant', content: item.assistantResponseMessage.content});
+        if (item.assistantResponseMessage) msgs.push({role: 'assistant', content: item.assistantResponseMessage.content, isHistory: true});
       }
     }
     if (cs.currentMessage?.userInputMessage) {
