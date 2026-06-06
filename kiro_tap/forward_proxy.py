@@ -151,6 +151,7 @@ class ForwardProxyServer:
         local_reverse_target: str | None = None,
         local_reverse_allowed_path_prefixes: tuple[str, ...] = (),
         store_stream_events: bool = False,
+        upstream_proxy: str | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -160,6 +161,7 @@ class ForwardProxyServer:
         self._local_reverse_target = local_reverse_target
         self._local_reverse_allowed_path_prefixes = local_reverse_allowed_path_prefixes
         self._store_stream_events = store_stream_events
+        self._upstream_proxy = upstream_proxy
         self._server: asyncio.Server | None = None
         self._client_tasks: set[asyncio.Task] = set()
         self._client_writers: set[asyncio.StreamWriter] = set()
@@ -248,11 +250,29 @@ class ForwardProxyServer:
         reader: asyncio.StreamReader,
         writer: asyncio.StreamWriter,
     ) -> None:
-        """Relay TCP bytes directly to upstream without TLS termination."""
+        """Relay TCP bytes to upstream; routes through upstream proxy when configured."""
         try:
-            up_reader, up_writer = await asyncio.wait_for(
-                asyncio.open_connection(hostname, port), timeout=15
-            )
+            if self._upstream_proxy:
+                parsed = urlparse(self._upstream_proxy)
+                up_reader, up_writer = await asyncio.wait_for(
+                    asyncio.open_connection(parsed.hostname, parsed.port or 8080), timeout=15
+                )
+                connect_req = f"CONNECT {hostname}:{port} HTTP/1.1\r\nHost: {hostname}:{port}\r\n\r\n"
+                up_writer.write(connect_req.encode())
+                await up_writer.drain()
+                resp_line = await asyncio.wait_for(up_reader.readline(), timeout=15)
+                if b"200" not in resp_line:
+                    log.debug(f"Upstream proxy CONNECT {hostname}:{port} rejected: {resp_line!r}")
+                    up_writer.close()
+                    return
+                while True:
+                    line = await asyncio.wait_for(up_reader.readline(), timeout=10)
+                    if line in (b"\r\n", b"\n", b""):
+                        break
+            else:
+                up_reader, up_writer = await asyncio.wait_for(
+                    asyncio.open_connection(hostname, port), timeout=15
+                )
         except (OSError, asyncio.TimeoutError) as e:
             log.debug(f"Passthrough connect failed {hostname}:{port}: {e}")
             return

@@ -534,6 +534,7 @@ async def async_main(args: argparse.Namespace):
                 local_reverse_target=args.target,
                 local_reverse_allowed_path_prefixes=CLIENT_CONFIGS[args.client].forward_base_url_allowed_path_prefixes,
                 store_stream_events=args.store_stream_events,
+                upstream_proxy=getattr(args, "upstream_proxy", None),
             )
             actual_port = await forward_server.start()
             print(f"🔍 kiro-tap v{__version__} forward proxy on http://{args.host}:{actual_port}")
