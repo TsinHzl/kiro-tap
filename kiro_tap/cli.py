@@ -96,6 +96,7 @@ class ClientConfig:
     # local proxy and let the forward proxy bridge selected paths to target.
     forward_base_url_envs: tuple[str, ...] = ()
     forward_base_url_allowed_path_prefixes: tuple[str, ...] = ()
+    additional_intercept_hosts: tuple[str, ...] = ()
 
     @property
     def missing_help(self) -> str:
@@ -138,6 +139,7 @@ CLIENT_CONFIGS: dict[str, ClientConfig] = {
         base_url_suffix="",
         default_target="https://q.us-east-1.amazonaws.com",
         default_proxy_mode="forward",
+        additional_intercept_hosts=("runtime.us-east-1.kiro.dev", "management.us-east-1.kiro.dev"),
     ),
     "kiro-ide": ClientConfig(
         cmd="kiro",
@@ -147,6 +149,7 @@ CLIENT_CONFIGS: dict[str, ClientConfig] = {
         base_url_suffix="",
         default_target="https://q.us-east-1.amazonaws.com",
         default_proxy_mode="forward",
+        additional_intercept_hosts=("runtime.us-east-1.kiro.dev", "management.us-east-1.kiro.dev"),
     ),
 }
 
@@ -540,6 +543,7 @@ async def async_main(args: argparse.Namespace):
                 local_reverse_allowed_path_prefixes=CLIENT_CONFIGS[args.client].forward_base_url_allowed_path_prefixes,
                 store_stream_events=args.store_stream_events,
                 upstream_proxy=getattr(args, "upstream_proxy", None),
+                additional_intercept_hosts=CLIENT_CONFIGS[args.client].additional_intercept_hosts,
             )
             actual_port = await forward_server.start()
             print(f"🔍 kiro-tap v{__version__} forward proxy on http://{args.host}:{actual_port}")

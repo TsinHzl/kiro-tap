@@ -152,6 +152,7 @@ class ForwardProxyServer:
         local_reverse_allowed_path_prefixes: tuple[str, ...] = (),
         store_stream_events: bool = False,
         upstream_proxy: str | None = None,
+        additional_intercept_hosts: tuple[str, ...] = (),
     ) -> None:
         self.host = host
         self.port = port
@@ -162,6 +163,7 @@ class ForwardProxyServer:
         self._local_reverse_allowed_path_prefixes = local_reverse_allowed_path_prefixes
         self._store_stream_events = store_stream_events
         self._upstream_proxy = upstream_proxy
+        self._additional_intercept_hosts = additional_intercept_hosts
         self._server: asyncio.Server | None = None
         self._client_tasks: set[asyncio.Task] = set()
         self._client_writers: set[asyncio.StreamWriter] = set()
@@ -241,7 +243,7 @@ class ForwardProxyServer:
             target_host = _urlparse(self._local_reverse_target).hostname or ""
             if hostname == target_host:
                 return True
-        return False
+        return hostname in self._additional_intercept_hosts
 
     async def _tcp_passthrough(
         self,
@@ -329,7 +331,9 @@ class ForwardProxyServer:
 
         # Non-target hosts (e.g. OAuth/auth endpoints) are passed through as raw
         # TCP tunnels without TLS termination so login flows work correctly.
-        if not self._should_intercept(hostname):
+        should_intercept = self._should_intercept(hostname)
+        log.debug(f"CONNECT {hostname}:{port} -> {'intercept' if should_intercept else 'passthrough'}")
+        if not should_intercept:
             await self._tcp_passthrough(hostname, port, reader, writer)
             return
 

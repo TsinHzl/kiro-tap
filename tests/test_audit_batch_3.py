@@ -36,7 +36,7 @@ class TestS1OpenProxyBlock:
         server._local_reverse_target = None
         server._local_reverse_allowed_path_prefixes = ()
         server._store_stream_events = False
-        server._intercept_hostname = None
+        server._additional_intercept_hosts = ()
         server._client_tasks = set()
         server._client_writers = set()
         return server
