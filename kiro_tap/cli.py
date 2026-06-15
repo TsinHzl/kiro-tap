@@ -140,6 +140,10 @@ CLIENT_CONFIGS: dict[str, ClientConfig] = {
         default_target="https://q.us-east-1.amazonaws.com",
         default_proxy_mode="forward",
         additional_intercept_hosts=("runtime.us-east-1.kiro.dev", "management.us-east-1.kiro.dev"),
+        # Kiro CLI 2.7.0+ is a Mach-O binary linked against Apple's Security.framework
+        # (native TLS); it ignores SSL_CERT_FILE / NODE_EXTRA_CA_CERTS and only trusts
+        # CAs present in the macOS keychain.
+        auto_trust_ca_macos=True,
     ),
     "kiro-ide": ClientConfig(
         cmd="kiro",
@@ -150,6 +154,7 @@ CLIENT_CONFIGS: dict[str, ClientConfig] = {
         default_target="https://q.us-east-1.amazonaws.com",
         default_proxy_mode="forward",
         additional_intercept_hosts=("runtime.us-east-1.kiro.dev", "management.us-east-1.kiro.dev"),
+        auto_trust_ca_macos=True,
     ),
 }
 

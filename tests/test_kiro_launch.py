@@ -37,6 +37,14 @@ def test_kiro_ide_registered_in_client_configs() -> None:
     assert cfg.default_proxy_mode == "forward"
 
 
+def test_kiro_clients_auto_trust_ca_on_macos() -> None:
+    # Kiro CLI 2.7.0+ is a Mach-O binary using Apple's Security.framework for TLS,
+    # so SSL_CERT_FILE / NODE_EXTRA_CA_CERTS are ignored — the only viable trust
+    # path is the macOS keychain. Both kiro clients must opt in to keychain trust.
+    assert CLIENT_CONFIGS["kiro"].auto_trust_ca_macos is True
+    assert CLIENT_CONFIGS["kiro-ide"].auto_trust_ca_macos is True
+
+
 def test_parse_args_kiro_defaults_to_forward_mode() -> None:
     args = parse_args(["--tap-client", "kiro"])
     assert args.client == "kiro"
