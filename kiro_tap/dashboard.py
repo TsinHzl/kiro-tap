@@ -176,7 +176,7 @@ def merge_record_into_summary(
     if status_code >= 400 or _record_error(record):
         summary["status"] = "error"
         summary["error"] = summary.get("error") or _first_error([record])
-    else:
+    elif summary.get("status") != "error":
         summary["status"] = "active"
     return summary
 
@@ -317,14 +317,13 @@ def _summarize_session(
         if isinstance(turn, int):
             turns.add(turn)
 
-    # Status reflects the LAST record (last-record-wins), matching the
-    # incremental merge_record_into_summary path. A later success clears an
-    # earlier error; the first error is still retained in the "error" field.
-    last_record = records[-1] if records else None
-    last_failed = bool(last_record) and (
-        _response_status(last_record) >= 400 or bool(_record_error(last_record))
+    # Status is sticky: any record that failed marks the whole session as
+    # "error", matching TraceWriter's cumulative has_error semantics used by
+    # finalize_session. A later success no longer clears an earlier error.
+    any_failed = any(
+        _response_status(record) >= 400 or bool(_record_error(record)) for record in records
     )
-    if last_failed:
+    if any_failed:
         resolved_status = "error"
     elif is_current and records:
         resolved_status = "active"
