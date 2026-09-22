@@ -49,6 +49,10 @@ kiro-tap --tap-no-live
 
 # Don't auto-open browser
 kiro-tap --tap-no-open
+
+# When Kiro requires a VPN/proxy to reach AWS, pass the upstream proxy via --proxy (Clash/V2Ray, etc.)
+kiro-tap --proxy 7890
+kiro-tap --proxy http://127.0.0.1:7890
 ```
 
 ## How it works
@@ -91,7 +95,26 @@ All flags except `--tap-*` are forwarded to the selected Kiro client.
 --tap-no-update-check    Disable PyPI update check on startup
 --tap-no-auto-update     Check for updates but don't auto-download
 --tap-trust-ca           Trust local CA in macOS user login keychain (no sudo)
+--proxy URL              Upstream proxy for outbound requests (e.g. http://127.0.0.1:7890 for VPN/Clash; a bare port number is shorthand for http://127.0.0.1:<port>)
 ```
+
+## Upstream Proxy (VPN/Clash)
+
+If Kiro requires a proxy to reach the API, specify the upstream proxy with `--proxy`. Traffic flows through:
+
+```
+kiro-cli-chat → kiro-tap (local MitM) → upstream proxy (VPN/Clash) → AWS API
+```
+
+```bash
+# Shorthand: a bare port number expands to http://127.0.0.1:<port>
+kiro-tap --proxy 7890
+
+# Full form
+kiro-tap --proxy http://127.0.0.1:7890
+```
+
+Alternatively, omit `--proxy`: kiro-tap inherits `HTTPS_PROXY` / `ALL_PROXY` from its startup environment automatically (the startup banner prints `🌍 Upstream proxy: ...` when one is detected).
 
 ## Subcommands
 

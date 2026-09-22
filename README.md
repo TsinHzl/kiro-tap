@@ -47,6 +47,10 @@ kiro-tap --tap-no-live
 
 # 不自动打开浏览器
 kiro-tap --tap-no-open
+
+# Kiro 需要走 VPN/代理才能访问时，通过 --proxy 指定上游代理（Clash/V2Ray 等）
+kiro-tap --proxy 7890
+kiro-tap --proxy http://127.0.0.1:7890
 ```
 
 ## 工作原理
@@ -89,7 +93,26 @@ kiro-tap 使用**正向代理模式**（CONNECT + TLS 终止），因为 Kiro CL
 --tap-no-update-check    禁用启动时的 PyPI 更新检查
 --tap-no-auto-update     检查更新但不自动下载
 --tap-trust-ca           在 macOS 用户登录钥匙串中信任本地 CA（无需 sudo）
+--proxy URL              上游代理，用于出站请求（如 http://127.0.0.1:7890，Clash/VPN 场景；纯数字等价于 http://127.0.0.1:<port>）
 ```
+
+## 上游代理（VPN/Clash）
+
+如果 Kiro 必须走代理才能访问，用 `--proxy` 指定上游代理，流量链路为：
+
+```
+kiro-cli-chat → kiro-tap（本地 MitM）→ 上游代理（VPN/Clash）→ AWS API
+```
+
+```bash
+# 简写：纯数字自动补全为 http://127.0.0.1:<port>
+kiro-tap --proxy 7890
+
+# 完整写法
+kiro-tap --proxy http://127.0.0.1:7890
+```
+
+也可以不传 `--proxy`：kiro-tap 会自动继承启动环境中的 `HTTPS_PROXY` / `ALL_PROXY` 环境变量（启动时会打印 `🌍 Upstream proxy: ...` 提示检测到的上游代理）。
 
 ## 子命令
 
