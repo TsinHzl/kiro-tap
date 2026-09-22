@@ -1,0 +1,25 @@
+README.md
+  d81e5982f1749d65 50-53,96,98-104,107-115
+README_en.md
+  d81e5982f1749d65 52-55,98,100-106,109-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "0ff8fb38bef7c3027de98b73e7775799d6b9603c",
+  "prompts": {
+    "d81e5982f1749d65": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "607efbcd-0edf-4846-a87f-911167993adb",
+        "model": "glm_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 46,
+      "total_deletions": 0,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}
