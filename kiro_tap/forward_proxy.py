@@ -33,10 +33,12 @@ from aiohttp.http_websocket import WebSocketWriter
 from kiro_tap.aws_event_stream import AWSEventStreamReassembler
 from kiro_tap.certs import CertificateAuthority
 from kiro_tap.forward_http import (  # noqa: F401  # re-export relocated helpers
+    _MAX_BODY_BYTES,
     _build_ws_accept,
     _is_websocket_upgrade,
     _matches_path_prefix,
     _RawWSProtocol,
+    _read_chunked_body,
     _read_http_body,
 )
 from kiro_tap.proxy import (
