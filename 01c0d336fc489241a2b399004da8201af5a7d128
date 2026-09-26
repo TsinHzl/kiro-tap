@@ -1,0 +1,36 @@
+kiro_tap/forward_proxy.py
+  99168787dcb7ed5b 36,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "01c0d336fc489241a2b399004da8201af5a7d128",
+  "prompts": {
+    "8032833d99f6eaa5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77900875-b7ec-4582-9276-af4ee0715e5e",
+        "model": "glm_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 67,
+      "total_deletions": 0,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    },
+    "99168787dcb7ed5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea515f25-3a69-42d6-afc3-bd3fc9f85034",
+        "model": "glm_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
