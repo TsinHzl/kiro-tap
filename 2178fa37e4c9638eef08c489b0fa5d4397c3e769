@@ -1,0 +1,31 @@
+kiro_tap/cli_update.py
+  99168787dcb7ed5b 1-143
+kiro_tap/forward_proxy.py
+  99168787dcb7ed5b 31,35-38,40-41
+kiro_tap/cli.py
+  99168787dcb7ed5b 23-24,31-39
+kiro_tap/cli_dashboard.py
+  99168787dcb7ed5b 1-129
+kiro_tap/forward_http.py
+  99168787dcb7ed5b 17-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "2178fa37e4c9638eef08c489b0fa5d4397c3e769",
+  "prompts": {
+    "99168787dcb7ed5b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ea515f25-3a69-42d6-afc3-bd3fc9f85034",
+        "model": "glm_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 315,
+      "total_deletions": 24,
+      "accepted_lines": 297,
+      "overriden_lines": 2
+    }
+  }
+}
