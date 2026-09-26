@@ -28,7 +28,3 @@ def cleanup_trace_sessions(max_sessions: int, *, protected_session_id: str | Non
 def migrate_legacy_traces(output_dir: Path) -> int:
     """Import legacy JSONL/log files from an output directory once."""
     return get_trace_store().migrate_legacy_directory(output_dir)
-
-
-def _rel_posix(path: Path, base: Path) -> str:
-    return path.relative_to(base).as_posix()

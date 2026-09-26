@@ -251,35 +251,6 @@ class TraceStore:
         ).fetchall()
         return _rows_to_records(rows)
 
-    def load_boundary_records(self, session_id: str) -> list[dict[str, Any]]:
-        """Load the first and last records for a session without reading everything."""
-        conn = self._connect()
-        first = conn.execute(
-            """
-            SELECT payload_json
-            FROM records
-            WHERE session_id = ?
-            ORDER BY record_index
-            LIMIT 1
-            """,
-            (session_id,),
-        ).fetchone()
-        last = conn.execute(
-            """
-            SELECT payload_json
-            FROM records
-            WHERE session_id = ?
-            ORDER BY record_index DESC
-            LIMIT 1
-            """,
-            (session_id,),
-        ).fetchone()
-        if first is None:
-            return []
-        if last is None or first["payload_json"] == last["payload_json"]:
-            return _rows_to_records([first])
-        return _rows_to_records([first, last])
-
     def load_records_for_date(self, date_key: str) -> list[dict[str, Any]]:
         """Load all records for sessions on a given date in one query."""
         conn = self._connect()
@@ -592,27 +563,6 @@ class TraceStore:
         ).fetchone()
         return row is not None
 
-    def _migration_done(self, marker: str) -> bool:
-        conn = self._connect()
-        row = conn.execute(
-            "SELECT value FROM migration_state WHERE key = ?",
-            (marker,),
-        ).fetchone()
-        return row is not None
-
-    def _mark_migration_done(self, marker: str) -> None:
-        with self._write_lock:
-            conn = self._connect()
-            conn.execute(
-                """
-                INSERT INTO migration_state (key, value)
-                VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                """,
-                (marker, datetime.now(timezone.utc).isoformat()),
-            )
-            conn.commit()
-
     def _refresh_summary_after_append(
         self,
         conn: sqlite3.Connection,
@@ -879,10 +829,6 @@ def _manifest_entries_by_rel_path(output_dir: Path) -> dict[str, dict[str, Any]]
             if isinstance(file_name, str):
                 entries[file_name.replace("\\", "/")] = entry
     return entries
-
-
-def _manifest_entry_for_rel_path(output_dir: Path, rel_path: str) -> dict[str, Any]:
-    return _manifest_entries_by_rel_path(output_dir).get(rel_path, {})
 
 
 def _legacy_started_at(

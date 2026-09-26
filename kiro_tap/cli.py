@@ -665,8 +665,6 @@ async def async_main(args: argparse.Namespace):
     return exit_code
 
 
-TARGET_DETECTORS: dict[str, object] = {}
-
 
 def _reverse_proxy_trace_options(client: str, target: str) -> dict[str, object]:
     cfg = CLIENT_CONFIGS[client]

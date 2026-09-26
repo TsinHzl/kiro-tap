@@ -238,7 +238,6 @@ EVENT_TYPE_ASSISTANT_RESPONSE = "assistantResponseEvent"
 EVENT_TYPE_TOOL_USE = "toolUseEvent"
 EVENT_TYPE_METERING = "meteringEvent"
 EVENT_TYPE_CONTEXT_USAGE = "contextUsageEvent"
-EVENT_TYPE_CODE_REFERENCE = "codeReferenceEvent"
 
 
 # ---------------------------------------------------------------------------
