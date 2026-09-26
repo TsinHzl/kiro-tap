@@ -7,34 +7,42 @@ import asyncio
 import json
 import logging
 import os
-import re
 import shutil
 import signal
-import subprocess
+import ssl
 import sys
-import threading
-import urllib.error
-import urllib.request
-import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
-
-import ssl
 
 import aiohttp
 import certifi
 from aiohttp import web
 
 from kiro_tap.certs import CertificateAuthority, ensure_ca, is_macos_ca_trusted, trust_macos_ca
+
+# Re-export subcommand implementations moved to dedicated modules (pure code
+# relocation); existing imports of these names from kiro_tap.cli keep working.
+from kiro_tap.cli_dashboard import (  # noqa: F401
+    _is_dashboard_reusable,
+    _open_browser,
+    dashboard_main,
+    parse_dashboard_args,
+)
+from kiro_tap.cli_update import (  # noqa: F401
+    _build_update_command,
+    _check_pypi_version,
+    _detect_installer,
+    _start_background_update,
+    _version_key,
+    parse_update_args,
+    update_main,
+)
 from kiro_tap.forward_proxy import ForwardProxyServer
 from kiro_tap.history import cleanup_trace_sessions, migrate_legacy_traces
 from kiro_tap.proxy import proxy_handler
 from kiro_tap.shared_dashboard import (
     DEFAULT_DASHBOARD_PORT,
-    dashboard_url,
     ensure_shared_dashboard,
-    is_dashboard_healthy,
-    is_legacy_dashboard_healthy,
     resolve_dashboard_port,
 )
 from kiro_tap.trace import TraceWriter
@@ -56,15 +64,6 @@ try:
     __version__ = _pkg_version("kiro-tap")
 except Exception:
     __version__ = "0.0.0"
-
-
-def _open_browser(url: str) -> None:
-    """Open URL in browser without blocking. Silently ignores failures in headless environments."""
-    threading.Thread(target=lambda: webbrowser.open(url), daemon=True).start()
-
-
-async def _is_dashboard_reusable(host: str, port: int) -> bool:
-    return await is_dashboard_healthy(host, port) or await is_legacy_dashboard_healthy(host, port)
 
 
 @dataclass(frozen=True)
@@ -874,233 +873,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             tap_parser.error(f"--tap-allow-path '{prefix}' must not end with '/' (specify exact prefix)")
 
     return args
-
-
-def parse_dashboard_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse arguments for the standalone dashboard command."""
-    parser = argparse.ArgumentParser(
-        prog="kiro-tap dashboard",
-        description="Open a local kiro-tap dashboard for browsing trace history.",
-    )
-    parser.add_argument(
-        "--tap-output-dir",
-        default="./.traces",
-        dest="output_dir",
-        help="Legacy trace directory to import once (default: ./.traces)",
-    )
-    parser.add_argument(
-        "--tap-live-port",
-        type=int,
-        default=0,
-        dest="live_port",
-        help="Dashboard server port (default: auto)",
-    )
-    parser.add_argument(
-        "--tap-host",
-        default="127.0.0.1",
-        dest="host",
-        help="Bind address (default: 127.0.0.1)",
-    )
-    parser.add_argument(
-        "--tap-no-open",
-        action="store_false",
-        dest="open_viewer",
-        default=True,
-        help="Don't auto-open the dashboard in a browser",
-    )
-    return parser.parse_args(argv)
-
-
-async def dashboard_main(args: argparse.Namespace) -> int:
-    """Run the standalone dashboard until interrupted."""
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    host = args.host
-    if host not in ("127.0.0.1", "::1", "localhost"):
-        print(
-            f"⚠️  SECURITY: binding dashboard to {host} exposes trace history on all interfaces "
-            "with NO authentication. Anyone who can reach this host can read intercepted "
-            "traffic (including request/response bodies) and delete trace history. "
-            "Use 127.0.0.1 unless you fully trust the network."
-        )
-    port = resolve_dashboard_port(args.live_port)
-    if await _is_dashboard_reusable(host, port):
-        migrate_legacy_traces(output_dir)
-        url = dashboard_url(host, port)
-        print(f"🌐 kiro-tap dashboard already running: {url}")
-        print(f"🗄️  Trace database: {resolve_db_path()}")
-        if args.open_viewer:
-            _open_browser(url)
-        return 0
-
-    from kiro_tap.live import LiveViewerServer
-
-    server = LiveViewerServer(
-        port=port,
-        host=host,
-        migrate_from=output_dir,
-        dashboard_mode=True,
-    )
-    try:
-        await server.start()
-    except OSError:
-        if await _is_dashboard_reusable(host, port):
-            migrate_legacy_traces(output_dir)
-            url = dashboard_url(host, port)
-            print(f"🌐 kiro-tap dashboard already running: {url}")
-            if args.open_viewer:
-                _open_browser(url)
-            return 0
-        raise
-    print(f"🌐 kiro-tap dashboard: {server.url}")
-    print(f"🗄️  Trace database: {resolve_db_path()}")
-    if output_dir.exists():
-        print(f"📁 Legacy import dir: {output_dir}")
-    print("Press Ctrl+C to stop.")
-    if args.open_viewer:
-        _open_browser(server.url)
-
-    try:
-        while True:
-            await asyncio.sleep(3600)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await server.stop()
-    return 0
-
-
-# ---------------------------------------------------------------------------
-# Smart update check
-# ---------------------------------------------------------------------------
-
-
-def _version_key(v: str) -> tuple:
-    """Build a PEP440-aware sort key from a version string.
-
-    Handles release segments plus pre-release/dev/post suffixes so that
-    e.g. 0.2.0 > 0.2.0rc1 > 0.2.0b1 > 0.2.0a1 > 0.2.0.dev1, and
-    0.2.0.post1 > 0.2.0. Unknown suffixes are ignored gracefully.
-    """
-    s = v.strip().lower()
-    m = re.match(r"(\d+(?:\.\d+)*)(.*)$", s)
-    if not m:
-        return ((0,), 0, 0)
-    release = tuple(int(x) for x in m.group(1).split("."))
-    rest = m.group(2)
-
-    pre_rank = {"a": 0, "alpha": 0, "b": 1, "beta": 1, "rc": 2, "c": 2}
-    dev_m = re.search(r"\.?dev(\d*)", rest)
-    post_m = re.search(r"\.?post(\d*)", rest)
-    pre_m = re.search(r"(alpha|beta|rc|a|b|c)\.?(\d*)", rest)
-
-    if post_m:
-        phase, phase_num = 2, int(post_m.group(1) or 0)
-    elif pre_m:
-        phase = 0
-        phase_num = pre_rank.get(pre_m.group(1), 0) * 1000 + int(pre_m.group(2) or 0)
-    elif dev_m:
-        phase, phase_num = -1, int(dev_m.group(1) or 0)
-    else:
-        phase, phase_num = 1, 0
-
-    return (release, phase, phase_num)
-
-
-async def _check_pypi_version(timeout: float = 3.0) -> str | None:
-    """Check PyPI for the latest version. Returns version string or None."""
-    url = os.environ.get("KIROTAP_PYPI_URL", "https://pypi.org/pypi/kiro-tap/json")
-
-    def _fetch() -> str | None:
-        try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read())
-                return data.get("info", {}).get("version")
-        except Exception:
-            return None
-
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _fetch)
-
-
-def _detect_installer() -> str:
-    """Detect whether kiro-tap was installed via uv or pip."""
-    exe = sys.executable or ""
-    if "uv" in exe.lower() or shutil.which("uv"):
-        return "uv"
-    return "pip"
-
-
-def _start_background_update(installer: str) -> subprocess.Popen | None:
-    """Start a background process to upgrade kiro-tap."""
-    try:
-        cmd = _build_update_command(installer)
-        if cmd is None:
-            return None
-        return subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
-    except Exception:
-        return None
-
-
-def _build_update_command(installer: str) -> list[str] | None:
-    """Build the foreground/background self-upgrade command."""
-    if installer == "uv":
-        uv_path = shutil.which("uv")
-        if uv_path is None:
-            return None
-        return [uv_path, "tool", "upgrade", "kiro-tap"]
-    if installer == "pip":
-        return [sys.executable, "-m", "pip", "install", "--upgrade", "kiro-tap"]
-    raise ValueError(f"unsupported installer: {installer}")
-
-
-def parse_update_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse arguments for the update subcommand."""
-    parser = argparse.ArgumentParser(
-        prog="kiro-tap update",
-        description="Upgrade kiro-tap using the detected installer.",
-    )
-    parser.add_argument(
-        "--installer",
-        choices=["auto", "uv", "pip"],
-        default="auto",
-        help="Upgrade backend to use (default: auto-detect uv or pip)",
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the upgrade command without running it",
-    )
-    return parser.parse_args(argv)
-
-
-def update_main(argv: list[str] | None = None) -> int:
-    """Entry point for the update subcommand."""
-    args = parse_update_args(argv)
-    installer = _detect_installer() if args.installer == "auto" else args.installer
-    cmd = _build_update_command(installer)
-    if cmd is None:
-        print("Error: 'uv' command not found. Re-run with --installer pip or install uv.", file=sys.stderr)
-        return 1
-
-    printable_cmd = " ".join(cmd)
-    print(f"Upgrading kiro-tap with {installer}: {printable_cmd}")
-    if args.dry_run:
-        return 0
-
-    try:
-        result = subprocess.run(cmd, check=False)
-    except OSError as exc:
-        print(f"Error: failed to run update command: {exc}", file=sys.stderr)
-        return 1
-    return result.returncode
 
 
 def parse_trust_ca_args(argv: list[str] | None = None) -> argparse.Namespace:
