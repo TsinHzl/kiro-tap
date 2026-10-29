@@ -2,6 +2,45 @@
 
 from __future__ import annotations
 
+import math
+
+_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "input_tokens": ("input_tokens", "prompt_tokens", "promptTokenCount"),
+    "output_tokens": ("output_tokens", "completion_tokens", "candidatesTokenCount"),
+    "cache_read_input_tokens": (
+        "cache_read_input_tokens",
+        "cached_tokens",
+        "cachedContentTokenCount",
+        "input_tokens_details.cached_tokens",
+        "prompt_tokens_details.cached_tokens",
+    ),
+    "cache_creation_input_tokens": ("cache_creation_input_tokens",),
+}
+
+_THINKING_ALIASES: tuple[str, ...] = (
+    "thinking_tokens",
+    "output_tokens_details.thinking_tokens",
+    "output_tokens_details.reasoning_tokens",
+    "completion_tokens_details.reasoning_tokens",
+    "thoughtsTokenCount",
+)
+
+
+def _lookup(usage: dict, path: str) -> object:
+    """Resolve a dotted path, returning None when a level is missing or non-dict."""
+    current: object = usage
+    for part in path.split("."):
+        if not isinstance(current, dict):
+            return None
+        current = current.get(part)
+    return current
+
+
+def _is_finite_number(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int | float) and math.isfinite(value)
+
 
 def normalize_usage(usage: object) -> dict:
     """Return usage with provider-specific token fields mapped to shared names."""
@@ -9,27 +48,25 @@ def normalize_usage(usage: object) -> dict:
         return {}
 
     normalized = dict(usage)
-    if "input_tokens" not in normalized and "prompt_tokens" in usage:
-        normalized["input_tokens"] = usage["prompt_tokens"]
-    if "input_tokens" not in normalized and "promptTokenCount" in usage:
-        normalized["input_tokens"] = usage["promptTokenCount"]
-    if "output_tokens" not in normalized and "completion_tokens" in usage:
-        normalized["output_tokens"] = usage["completion_tokens"]
-    if "output_tokens" not in normalized and "candidatesTokenCount" in usage:
-        normalized["output_tokens"] = usage["candidatesTokenCount"]
 
-    if "cache_read_input_tokens" not in normalized:
-        cached = usage.get("cached_tokens")
-        if cached is None:
-            cached = usage.get("cachedContentTokenCount")
-        if cached is None:
-            for details_key in ("input_tokens_details", "prompt_tokens_details"):
-                details = usage.get(details_key)
-                if isinstance(details, dict):
-                    cached = details.get("cached_tokens")
-                    if cached is not None:
-                        break
-        if cached is not None:
-            normalized["cache_read_input_tokens"] = cached
+    for target, aliases in _FIELD_ALIASES.items():
+        if _lookup(usage, target) is not None:
+            continue
+        for alias in aliases:
+            value = _lookup(usage, alias)
+            if value is not None:
+                normalized[target] = value
+                break
+
+    thinking = None
+    for alias in _THINKING_ALIASES:
+        value = _lookup(usage, alias)
+        if _is_finite_number(value):
+            thinking = value
+            break
+    if thinking is None:
+        normalized.pop("thinking_tokens", None)
+    else:
+        normalized["thinking_tokens"] = thinking
 
     return normalized

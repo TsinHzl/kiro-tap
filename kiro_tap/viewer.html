@@ -675,6 +675,38 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .tok-dot { width: 6px; height: 6px; border-radius: 50%; }
 .tok-label { color: var(--text-tertiary); font-size: 11px; }
 .tok-val { color: var(--text-secondary); font-weight: 600; font-family: var(--mono); font-size: 11px; }
+.turn-breakdown-card {
+  margin: 8px 0 12px;
+}
+.turn-breakdown-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  padding: 8px 0;
+}
+.turn-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.turn-breakdown-table th,
+.turn-breakdown-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.turn-breakdown-table th:first-child,
+.turn-breakdown-table td:first-child,
+.turn-breakdown-table th:last-child,
+.turn-breakdown-table td:last-child {
+  text-align: left;
+}
+.turn-breakdown-body {
+  overflow-x: auto;
+}
 
 /* ─── JSON viewer ─── */
 .json-view {
@@ -1492,9 +1524,11 @@ body:not(.standalone) .main { margin-left: 0; }
     <div class="stat-group" id="stat-output-group" style="display:none"><span style="color:var(--green)">&#9679;</span><span>Out</span> <span class="stat-val" id="stat-output">0</span></div>
     <div class="stat-group" id="stat-cache-read-group" style="display:none"><span style="color:var(--cyan)">&#9679;</span><span>Cache R</span> <span class="stat-val" id="stat-cache-read">0</span></div>
     <div class="stat-group" id="stat-cache-write-group" style="display:none"><span style="color:var(--amber)">&#9679;</span><span>Cache W</span> <span class="stat-val" id="stat-cache-write">0</span></div>
+    <div class="stat-group" id="stat-thinking-group" style="display:none"><span style="color:var(--orange)">&#9679;</span><span id="label-thinking" data-i18n="tok_thinking">Think</span> <span class="stat-val" id="stat-thinking">0</span></div>
     <div class="stat-group"><span id="label-time">Time</span> <span class="stat-val" id="stat-duration">0s</span></div>
     <div id="live-status" style="display:none;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500;align-items:center;gap:6px;"></div>
   </div>
+  <div id="turn-breakdown-bar" class="turn-breakdown-card" style="display:none"></div>
   <div class="viewer-actions" id="viewer-actions" style="display:none"></div>
   <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
     <option value="en">English</option>
@@ -2059,6 +2093,11 @@ function buildStubEntry(meta, rawIdx) {
   if (meta.output_tokens) usage.output_tokens = meta.output_tokens;
   if (meta.cache_read_input_tokens) usage.cache_read_input_tokens = meta.cache_read_input_tokens;
   if (meta.cache_creation_input_tokens) usage.cache_creation_input_tokens = meta.cache_creation_input_tokens;
+  // Only trust meta.thinking_tokens when it is a finite number; otherwise the
+  // normalization layer will leave the key absent (reported as 0 on render).
+  if (typeof meta.thinking_tokens === 'number' && Number.isFinite(meta.thinking_tokens)) {
+    usage.thinking_tokens = meta.thinking_tokens;
+  }
 
   // Build a minimal system field to support task fingerprinting
   const body = { model: meta.model || '' };
@@ -2211,6 +2250,12 @@ function updateStaticTexts() {
     }
   }
   if (e('label-time')) e('label-time').textContent = t('stats_time');
+  if (e('label-thinking')) e('label-thinking').textContent = t('tok_thinking');
+  const thinkingLabel = e('label-thinking');
+  if (thinkingLabel && thinkingLabel.parentElement) {
+    thinkingLabel.parentElement.title = t('thinking_subset_hint');
+    thinkingLabel.parentElement.setAttribute('aria-label', t('thinking_subset_hint'));
+  }
   if (e('drop-title')) e('drop-title').textContent = t('drop_title');
   if (e('drop-desc')) e('drop-desc').textContent = t('drop_desc');
   if (e('drop-btn-label')) e('drop-btn-label').textContent = t('drop_btn');
@@ -2753,16 +2798,17 @@ function applyFilter(preserveDetail) {
   }
   filtered.sort((a, b) => compareTurns(a.turn, b.turn));
   let totalTokens = 0, totalDuration = 0;
-  let sumInput = 0, sumOutput = 0, sumCacheRead = 0, sumCacheCreate = 0;
+  let sumInput = 0, sumOutput = 0, sumCacheRead = 0, sumCacheCreate = 0, sumThinking = 0;
   filtered.forEach(e => {
     totalDuration += e.duration_ms || 0;
     const u = getUsage(e);
     if (u) {
-      totalTokens += (u.input_tokens || 0) + (u.output_tokens || 0);
-      sumInput += u.input_tokens || 0;
-      sumOutput += u.output_tokens || 0;
-      sumCacheRead += u.cache_read_input_tokens || 0;
-      sumCacheCreate += u.cache_creation_input_tokens || 0;
+      totalTokens += toFinite(u.input_tokens) + toFinite(u.output_tokens) + toFinite(u.cache_read_input_tokens) + toFinite(u.cache_creation_input_tokens);
+      sumInput += toFinite(u.input_tokens);
+      sumOutput += toFinite(u.output_tokens);
+      sumCacheRead += toFinite(u.cache_read_input_tokens);
+      sumCacheCreate += toFinite(u.cache_creation_input_tokens);
+      sumThinking += toFinite(u.thinking_tokens);
     }
   });
   $('#stat-turns').textContent = filtered.length;
@@ -2774,16 +2820,86 @@ function applyFilter(preserveDetail) {
     $('#stat-input-group').style.display = 'flex';
     $('#stat-output').textContent = sumOutput.toLocaleString();
     $('#stat-output-group').style.display = 'flex';
-    if (sumCacheRead) { $('#stat-cache-read').textContent = sumCacheRead.toLocaleString(); $('#stat-cache-read-group').style.display = 'flex'; }
-    else { $('#stat-cache-read-group').style.display = 'none'; }
-    if (sumCacheCreate) { $('#stat-cache-write').textContent = sumCacheCreate.toLocaleString(); $('#stat-cache-write-group').style.display = 'flex'; }
-    else { $('#stat-cache-write-group').style.display = 'none'; }
+    $('#stat-cache-read').textContent = sumCacheRead.toLocaleString();
+    $('#stat-cache-read-group').style.display = 'flex';
+    $('#stat-cache-write').textContent = sumCacheCreate.toLocaleString();
+    $('#stat-cache-write-group').style.display = 'flex';
+    $('#stat-thinking').textContent = sumThinking.toLocaleString();
+    $('#stat-thinking-group').style.display = 'flex';
   } else {
-    ['stat-input-group','stat-output-group','stat-cache-read-group','stat-cache-write-group'].forEach(id => $('#'+id).style.display = 'none');
+    ['stat-input-group','stat-output-group','stat-cache-read-group','stat-cache-write-group','stat-thinking-group'].forEach(id => $('#'+id).style.display = 'none');
   }
   renderToolFilter();
+  renderTurnBreakdown(filtered);
   renderSidebar(preserveDetail);
   updatePositionIndicator();
+}
+
+function renderTurnBreakdown(filtered) {
+  const wrap = $('#turn-breakdown-bar');
+  if (!wrap) return;
+  const sums = new Map();
+  for (const e of filtered) {
+    const u = getUsage(e);
+    let turn = e.turn;
+    if (typeof turn !== 'number' || !Number.isInteger(turn)) turn = null;
+    if (!sums.has(turn)) {
+      sums.set(turn, { turn, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, thinking: 0, total: 0, duration: 0, model: '', count: 0 });
+    }
+    const s = sums.get(turn);
+    const inV = u ? toFinite(u.input_tokens) : 0;
+    const outV = u ? toFinite(u.output_tokens) : 0;
+    const cr = u ? toFinite(u.cache_read_input_tokens) : 0;
+    const cw = u ? toFinite(u.cache_creation_input_tokens) : 0;
+    const th = u ? toFinite(u.thinking_tokens) : 0;
+    s.input += inV; s.output += outV; s.cacheRead += cr; s.cacheWrite += cw;
+    s.thinking += th; s.total += inV + outV + cr + cw;
+    s.duration += e.duration_ms || 0;
+    s.count += 1;
+    const model = (e.request && e.request.body && e.request.body.model) || '';
+    if (model) s.model = model;
+  }
+  if (!sums.size) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const rows = [...sums.values()].sort((a, b) => {
+    if (a.turn === null) return 1;
+    if (b.turn === null) return -1;
+    return a.turn - b.turn;
+  }).map(s => {
+    const turn = s.turn === null ? esc(t('turn_breakdown_unknown_turn')) : esc(String(s.turn));
+    return `<tr>
+      <td>${turn}</td>
+      <td>${s.input.toLocaleString()}</td>
+      <td>${s.output.toLocaleString()}</td>
+      <td>${s.cacheRead.toLocaleString()}</td>
+      <td>${s.cacheWrite.toLocaleString()}</td>
+      <td>${s.thinking.toLocaleString()}</td>
+      <td>${s.total.toLocaleString()}</td>
+      <td>${s.duration.toLocaleString()}</td>
+      <td>${esc(s.model || '—')}</td>
+    </tr>`;
+  }).join('');
+  wrap.style.display = '';
+  wrap.innerHTML = `<details class="turn-breakdown-details open">
+    <summary>${esc(t('turn_breakdown_title'))}</summary>
+    <div class="turn-breakdown-body">
+      <table class="turn-breakdown-table">
+        <thead><tr>
+          <th>${esc(t('turn_col'))}</th>
+          <th>${esc(t('tok_input'))}</th>
+          <th>${esc(t('tok_output'))}</th>
+          <th>${esc(t('tok_cache_read'))}</th>
+          <th>${esc(t('tok_cache_create'))}</th>
+          <th>${esc(t('tok_thinking'))}</th>
+          <th>${esc(t('tok_total'))}</th>
+          <th>${esc(t('turn_col_duration'))}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </details>`;
 }
 
 function renderToolFilter() {
@@ -4620,6 +4736,11 @@ function shouldRenderRequestContext(entry, body, msgs, respOutput) {
   return true;
 }
 
+function toFinite(v) {
+  // Treat missing, NaN, or non-finite values as 0 so a single bad record cannot
+  // poison the whole header sum into NaN.
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
 function normalizeUsage(usage) {
   if (!usage || typeof usage !== 'object') return null;
   const normalized = { ...usage };
@@ -4648,7 +4769,36 @@ function normalizeUsage(usage) {
       normalized.cache_read_input_tokens = cached;
     }
   }
+  // Thinking tokens: same four-way priority as the backend. A candidate is
+  // valid only when it is a finite number; otherwise fall through. If nothing
+  // valid is found, drop the key rather than write 0 so callers can tell
+  // "not reported" from "zero".
+  const thinkingSources = [
+    () => lookupOwn(usage, 'thinking_tokens'),
+    () => lookupOwn(usage, 'output_tokens_details', 'thinking_tokens'),
+    () => lookupOwn(usage, 'output_tokens_details', 'reasoning_tokens'),
+    () => lookupOwn(usage, 'completion_tokens_details', 'reasoning_tokens'),
+    () => lookupOwn(usage, 'thoughtsTokenCount'),
+  ];
+  let thinking = undefined;
+  for (const src of thinkingSources) {
+    const val = typeof src === 'function' ? src() : src;
+    if (typeof val === 'number' && Number.isFinite(val)) { thinking = val; break; }
+  }
+  if (thinking === undefined) {
+    delete normalized.thinking_tokens;
+  } else {
+    normalized.thinking_tokens = thinking;
+  }
   return normalized;
+}
+
+function lookupOwn(obj, a, b) {
+  // Dotted-path lookup that treats a missing or non-object level like undefined.
+  if (!obj || typeof obj !== 'object') return undefined;
+  if (b === undefined) return obj[a];
+  if (obj[a] && typeof obj[a] === 'object') return obj[a][b];
+  return undefined;
 }
 
 // Extract token usage from response.body.usage or SSE response.completed event
@@ -5047,10 +5197,11 @@ function renderResponseContent(body, contextOnly = false) {
 
 function renderTokenUsage(u) {
   const items = [
-    { label: t('tok_input'), val: u.input_tokens || 0, color: 'var(--primary)' },
-    { label: t('tok_output'), val: u.output_tokens || 0, color: 'var(--green)' },
-    { label: t('tok_cache_read'), val: u.cache_read_input_tokens || 0, color: 'var(--cyan)' },
-    { label: t('tok_cache_create'), val: u.cache_creation_input_tokens || 0, color: 'var(--amber)' },
+    { label: t('tok_input'), val: toFinite(u.input_tokens), color: 'var(--primary)' },
+    { label: t('tok_output'), val: toFinite(u.output_tokens), color: 'var(--green)' },
+    { label: t('tok_cache_read'), val: toFinite(u.cache_read_input_tokens), color: 'var(--cyan)' },
+    { label: t('tok_cache_create'), val: toFinite(u.cache_creation_input_tokens), color: 'var(--amber)' },
+    { label: t('tok_thinking'), val: toFinite(u.thinking_tokens), color: 'var(--orange)' },
   ];
   return `<div class="token-bar">${items.map(i =>
     `<div class="tok-item"><span class="tok-dot" style="background:${i.color}"></span><span class="tok-label">${i.label}</span><span class="tok-val">${i.val.toLocaleString()}</span></div>`
