@@ -680,6 +680,7 @@ def _extract_metadata(record_json: str) -> dict | None:
         "output_tokens": usage.get("output_tokens", 0),
         "cache_read_input_tokens": usage.get("cache_read_input_tokens", 0),
         "cache_creation_input_tokens": usage.get("cache_creation_input_tokens", 0),
+        "thinking_tokens": usage.get("thinking_tokens", 0),
         "has_system": bool(sys_text),
         "message_count": len(msgs),
         "sys_hint": sys_text[:200],

@@ -243,7 +243,7 @@ body.detail-route .main { margin-left: 0; padding-top: 10px; }
 }
 .overview-card {
   display: grid;
-  grid-template-columns: repeat(4, max-content);
+  grid-template-columns: repeat(9, max-content);
   gap: 34px;
   align-items: start;
   min-height: 84px;
@@ -490,6 +490,72 @@ body.detail-route .detail-page-head {
   overflow: visible;
   padding: 0;
   background: var(--bg);
+}
+.detail-token-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 34px;
+  padding: 16px 0;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.detail-token-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-token-label {
+  color: var(--text-tertiary);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+.detail-token-value {
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 700;
+}
+.detail-turn-breakdown {
+  margin-bottom: 10px;
+}
+.turn-breakdown-card {
+  margin-bottom: 14px;
+}
+.turn-breakdown-details summary,
+.detail-turn-breakdown-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  padding: 10px 0;
+}
+.turn-breakdown-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.turn-breakdown-table th,
+.turn-breakdown-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.turn-breakdown-table th:first-child,
+.turn-breakdown-table td:first-child,
+.turn-breakdown-table th:nth-child(2),
+.turn-breakdown-table td:nth-child(2),
+.turn-breakdown-table th:last-child,
+.turn-breakdown-table td:last-child {
+  text-align: left;
+}
+.turn-breakdown-empty {
+  color: var(--text-tertiary);
+  padding: 10px 0;
+  font-size: 13px;
 }
 .viewer-frame-wrap {
   position: relative;
@@ -785,9 +851,36 @@ pre {
         <div class="metric-value" id="overview-error-rate">0.0%</div>
       </div>
       <div class="metric">
+        <div class="metric-label" data-i18n="metric_input_tokens">Input</div>
+        <div class="metric-value" id="overview-input">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_output_tokens">Output</div>
+        <div class="metric-value" id="overview-output">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_cache_read">Cache R</div>
+        <div class="metric-value" id="overview-cache-read">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_cache_write">Cache W</div>
+        <div class="metric-value" id="overview-cache-write">0</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label" data-i18n="metric_thinking">Thinking</div>
+        <div class="metric-value" id="overview-thinking">0</div>
+      </div>
+      <div class="metric">
         <div class="metric-label" data-i18n="metric_total_tokens">Total Tokens</div>
         <div class="metric-value" id="overview-tokens">0</div>
       </div>
+    </section>
+
+    <section class="turn-breakdown-card" aria-label="Per-turn token breakdown">
+      <details id="overview-turn-breakdown" class="turn-breakdown-details">
+        <summary data-i18n="turn_breakdown_title">Token breakdown by turn</summary>
+        <div id="overview-turn-breakdown-body" class="turn-breakdown-body"></div>
+      </details>
     </section>
 
     <section class="table-panel" aria-label="Trace sessions">
@@ -819,6 +912,8 @@ pre {
         <div class="detail-subtitle" id="detail-subtitle" data-i18n="no_session_selected">No session selected.</div>
       </div>
     </div>
+    <section id="detail-token-summary" class="detail-token-summary hidden"></section>
+    <section id="detail-turn-breakdown" class="detail-turn-breakdown hidden"></section>
     <section id="detail" class="detail">
       <div class="empty" data-i18n="select_session">Select a session to view details.</div>
     </section>
@@ -890,7 +985,18 @@ const DASHBOARD_I18N = {
     metric_threads: "Threads",
     metric_traces: "Traces",
     metric_error_rate: "Error Rate",
+    metric_input_tokens: "Input",
+    metric_output_tokens: "Output",
+    metric_cache_read: "Cache R",
+    metric_cache_write: "Cache W",
+    metric_thinking: "Thinking",
     metric_total_tokens: "Total Tokens",
+    turn_breakdown_title: "Token breakdown by turn",
+    turn_breakdown_empty: "No token records in the current selection.",
+    turn_breakdown_unknown_turn: "—",
+    turn_col: "Turn",
+    turn_col_session: "Session",
+    turn_col_duration: "Duration (ms)",
     table_start_time: "Start Time",
     table_first_message: "First Message",
     table_traces: "Traces",
@@ -970,7 +1076,18 @@ const DASHBOARD_I18N = {
     metric_threads: "会话数",
     metric_traces: "Trace 数",
     metric_error_rate: "错误率",
+    metric_input_tokens: "输入",
+    metric_output_tokens: "输出",
+    metric_cache_read: "缓存读",
+    metric_cache_write: "缓存写",
+    metric_thinking: "思考",
     metric_total_tokens: "总 Token",
+    turn_breakdown_title: "按轮次的 Token 明细",
+    turn_breakdown_empty: "当前筛选范围内没有 token 记录。",
+    turn_breakdown_unknown_turn: "—",
+    turn_col: "轮次",
+    turn_col_session: "会话",
+    turn_col_duration: "耗时 (ms)",
     table_start_time: "开始时间",
     table_first_message: "首条用户 Prompt",
     table_traces: "Trace",
@@ -1280,6 +1397,7 @@ function renderSessions() {
   }
 
   $("#session-list").innerHTML = sessions.map(session => sessionRow(session)).join("");
+  renderOverviewTurnBreakdown(sessions);
   document.querySelectorAll("[data-session]").forEach(row => {
     row.addEventListener("click", event => {
       event.preventDefault();
@@ -1315,13 +1433,138 @@ function sessionRow(session) {
 
 function renderOverview(sessions) {
   const traces = sessions.reduce((sum, session) => sum + session.record_count, 0);
-  const tokens = sessions.reduce((sum, session) => sum + session.total_tokens, 0);
+  const tokens = sessions.reduce((sum, session) => sum + (session.total_tokens || 0), 0);
+  const input = sessions.reduce((sum, x) => sum + (x.input_tokens || 0), 0);
+  const output = sessions.reduce((sum, x) => sum + (x.output_tokens || 0), 0);
+  const cacheRead = sessions.reduce((sum, x) => sum + (x.cache_read_tokens || 0), 0);
+  const cacheWrite = sessions.reduce((sum, x) => sum + (x.cache_create_tokens || 0), 0);
+  const thinking = sessions.reduce((sum, x) => sum + (x.thinking_tokens || 0), 0);
   const errors = sessions.filter(session => session.status === "error").length;
   const errorRate = sessions.length ? `${((errors / sessions.length) * 100).toFixed(1)}%` : "0.0%";
   $("#overview-threads").textContent = fmtNumber(sessions.length);
   $("#overview-traces").textContent = fmtNumber(traces);
   $("#overview-error-rate").textContent = errorRate;
+  $("#overview-input").textContent = fmtNumber(input);
+  $("#overview-output").textContent = fmtNumber(output);
+  $("#overview-cache-read").textContent = fmtNumber(cacheRead);
+  $("#overview-cache-write").textContent = fmtNumber(cacheWrite);
+  $("#overview-thinking").textContent = fmtNumber(thinking);
   $("#overview-tokens").textContent = fmtNumber(tokens);
+}
+
+function renderOverviewTurnBreakdown(sessions) {
+  const body = $("#overview-turn-breakdown-body");
+  const rows = [];
+  for (const session of sessions) {
+    const breakdown = session.turn_breakdown || [];
+    if (!breakdown.length) continue;
+    for (const entry of breakdown) {
+      const turnLabel = entry.turn === null || entry.turn === undefined ? t("turn_breakdown_unknown_turn") : entry.turn;
+      rows.push([session.agent || t("unknown"), turnLabel, entry, ""]);
+    }
+  }
+  if (!rows.length) {
+    body.innerHTML = `<div class="turn-breakdown-empty">${esc(t("turn_breakdown_empty"))}</div>`;
+    return;
+  }
+  body.innerHTML = `
+    <table class="turn-breakdown-table">
+      <thead><tr>
+        <th>${esc(t("turn_col_session"))}</th>
+        <th>${esc(t("turn_col"))}</th>
+        <th>${esc(t("metric_input_tokens"))}</th>
+        <th>${esc(t("metric_output_tokens"))}</th>
+        <th>${esc(t("metric_cache_read"))}</th>
+        <th>${esc(t("metric_cache_write"))}</th>
+        <th>${esc(t("metric_thinking"))}</th>
+        <th>${esc(t("metric_total_tokens"))}</th>
+        <th>${esc(t("turn_col_duration"))}</th>
+        <th>${esc(t("table_model"))}</th>
+      </tr></thead>
+      <tbody>${rows.map(([agent, turn, e]) => `
+        <tr>
+          <td>${esc(agent)}</td>
+          <td>${esc(turn)}</td>
+          <td>${fmtNumber(e.input_tokens || 0)}</td>
+          <td>${fmtNumber(e.output_tokens || 0)}</td>
+          <td>${fmtNumber(e.cache_read_tokens || 0)}</td>
+          <td>${fmtNumber(e.cache_create_tokens || 0)}</td>
+          <td>${fmtNumber(e.thinking_tokens || 0)}</td>
+          <td>${fmtNumber(e.total_tokens || 0)}</td>
+          <td>${fmtNumber(e.duration_ms || 0)}</td>
+          <td>${esc(e.model || t("unknown"))}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table>`;
+}
+
+function tokenFieldHtml(label, value) {
+  return `<div class="detail-token-field"><span class="detail-token-label">${esc(label)}</span><span class="detail-token-value">${fmtNumber(value)}</span></div>`;
+}
+
+function renderDetailTokenSummary(session) {
+  const el = $("#detail-token-summary");
+  if (!session || !session.id) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML = [
+    tokenFieldHtml(t("metric_input_tokens"), session.input_tokens || 0),
+    tokenFieldHtml(t("metric_output_tokens"), session.output_tokens || 0),
+    tokenFieldHtml(t("metric_cache_read"), session.cache_read_tokens || 0),
+    tokenFieldHtml(t("metric_cache_write"), session.cache_create_tokens || 0),
+    tokenFieldHtml(t("metric_thinking"), session.thinking_tokens || 0),
+    tokenFieldHtml(t("metric_total_tokens"), session.total_tokens || 0),
+  ].join("");
+}
+
+function renderDetailTurnBreakdown(session) {
+  const el = $("#detail-turn-breakdown");
+  if (!session || !session.id) {
+    el.classList.add("hidden");
+    return;
+  }
+  const breakdown = session.turn_breakdown || [];
+  if (!breakdown.length) {
+    el.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  const rows = breakdown.map(entry => {
+    const turn = entry.turn === null || entry.turn === undefined ? t("turn_breakdown_unknown_turn") : entry.turn;
+    return `<tr>
+      <td>${esc(turn)}</td>
+      <td>${fmtNumber(entry.input_tokens || 0)}</td>
+      <td>${fmtNumber(entry.output_tokens || 0)}</td>
+      <td>${fmtNumber(entry.cache_read_tokens || 0)}</td>
+      <td>${fmtNumber(entry.cache_create_tokens || 0)}</td>
+      <td>${fmtNumber(entry.thinking_tokens || 0)}</td>
+      <td>${fmtNumber(entry.total_tokens || 0)}</td>
+      <td>${fmtNumber(entry.duration_ms || 0)}</td>
+      <td>${esc(entry.model || t("unknown"))}</td>
+    </tr>`;
+  }).join("");
+  el.innerHTML = `
+    <details class="detail-turn-breakdown-details">
+      <summary>${esc(t("turn_breakdown_title"))}</summary>
+      <div class="turn-breakdown-body">
+        <table class="turn-breakdown-table">
+          <thead><tr>
+            <th>${esc(t("turn_col"))}</th>
+            <th>${esc(t("metric_input_tokens"))}</th>
+            <th>${esc(t("metric_output_tokens"))}</th>
+            <th>${esc(t("metric_cache_read"))}</th>
+            <th>${esc(t("metric_cache_write"))}</th>
+            <th>${esc(t("metric_thinking"))}</th>
+            <th>${esc(t("metric_total_tokens"))}</th>
+            <th>${esc(t("turn_col_duration"))}</th>
+            <th>${esc(t("table_model"))}</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </details>`;
 }
 
 function statusInfo(session) {
@@ -1394,6 +1637,8 @@ function updateDetailSessionSummary(session) {
   $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
   $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
   updateTracePathBar(session);
+  renderDetailTokenSummary(session);
+  renderDetailTurnBreakdown(session);
 }
 
 function detailRecordFetchLimit(sessionId, preserveLoaded) {
@@ -1460,6 +1705,8 @@ function renderDetail(session, records) {
   $("#detail-title").textContent = t("session_details", {agent: session.agent || t("session_detail")});
   $("#detail-subtitle").textContent = session.legacy_rel_path || session.id || "";
   updateTracePathBar(session);
+  renderDetailTokenSummary(session);
+  renderDetailTurnBreakdown(session);
 
   if (state.activeTab === "conversation") {
     const existingFrame = document.querySelector("[data-viewer-frame]");

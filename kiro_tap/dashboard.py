@@ -103,7 +103,7 @@ def load_trace_session(
     if row is None:
         return None
     summary = _apply_current_session_state(
-        _session_summary_from_row(store, row),
+        _session_summary_from_row(store, row, allow_backfill=True),
         current_session_id,
         live_record_count=(
             live_record_count
@@ -142,22 +142,22 @@ def merge_record_into_summary(
         )
 
     summary = dict(summary)
-    usage = _record_usage(record)
+    stats = _turn_stats(record)
     summary["record_count"] = record_count
-    summary["turn_count"] = max(int(summary.get("turn_count") or 0), record_count)
-    summary["input_tokens"] = int(summary.get("input_tokens") or 0) + usage.get("input_tokens", 0)
-    summary["output_tokens"] = int(summary.get("output_tokens") or 0) + usage.get("output_tokens", 0)
-    summary["cache_read_tokens"] = int(summary.get("cache_read_tokens") or 0) + usage.get("cache_read_input_tokens", 0)
-    summary["cache_create_tokens"] = int(summary.get("cache_create_tokens") or 0) + usage.get(
-        "cache_creation_input_tokens", 0
-    )
+    summary["input_tokens"] = int(summary.get("input_tokens") or 0) + stats["input_tokens"]
+    summary["output_tokens"] = int(summary.get("output_tokens") or 0) + stats["output_tokens"]
+    summary["cache_read_tokens"] = int(summary.get("cache_read_tokens") or 0) + stats["cache_read_tokens"]
+    summary["cache_create_tokens"] = int(summary.get("cache_create_tokens") or 0) + stats["cache_create_tokens"]
+    summary["thinking_tokens"] = int(summary.get("thinking_tokens") or 0) + stats["thinking_tokens"]
     summary["total_tokens"] = (
         summary["input_tokens"]
         + summary["output_tokens"]
         + summary["cache_read_tokens"]
         + summary["cache_create_tokens"]
     )
-    summary["duration_ms"] = int(summary.get("duration_ms") or 0) + _duration_ms(record)
+    summary["duration_ms"] = int(summary.get("duration_ms") or 0) + stats["duration_ms"]
+    summary["turn_breakdown"] = _merge_turn_entry(summary.get("turn_breakdown") or [], stats)
+    summary["turn_count"] = len(summary["turn_breakdown"])
     model = _record_model(record)
     if model:
         summary["model"] = model
@@ -201,7 +201,48 @@ def build_imported_session_summary(
     )
 
 
-def _session_summary_from_row(store: TraceStore, row: sqlite3.Row) -> dict[str, Any]:
+def _with_summary_defaults(summary: dict[str, Any]) -> dict[str, Any]:
+    """Fill missing summary fields without rescanning records."""
+    summary.setdefault("thinking_tokens", 0)
+    summary.setdefault("turn_breakdown", [])
+    breakdown = summary["turn_breakdown"]
+    if breakdown:
+        summary["turn_count"] = len(breakdown)
+    else:
+        summary["turn_count"] = int(summary.get("record_count") or 0)
+    return summary
+
+
+def _should_backfill(cached: dict[str, Any], row: sqlite3.Row) -> bool:
+    """Return True when a legacy summary lacks turn_breakdown and records exist."""
+    return "turn_breakdown" not in cached and int(row["record_count"] or 0) > 0
+
+
+def _backfill_summary(store: TraceStore, row: sqlite3.Row) -> dict[str, Any]:
+    """Rebuild a legacy summary from its records and persist it once."""
+    records = store.load_records(row["id"])
+    summary = _summarize_session(
+        session_id=row["id"],
+        date_key=row["date_key"] or "legacy",
+        legacy_rel_path=row["legacy_rel_path"],
+        records=records,
+        manifest_entry={"client": row["client"] or "", "proxy_mode": row["proxy_mode"] or ""},
+        status=row["status"] or "complete",
+        started_at=row["started_at"] or "",
+        updated_at=row["updated_at"] or "",
+        is_current=False,
+        record_count=int(row["record_count"] or len(records)),
+    )
+    store.store_summary(row["id"], summary)
+    return summary
+
+
+def _session_summary_from_row(
+    store: TraceStore,
+    row: sqlite3.Row,
+    *,
+    allow_backfill: bool = False,
+) -> dict[str, Any]:
     summary_json = row["summary_json"]
     if summary_json:
         try:
@@ -209,16 +250,17 @@ def _session_summary_from_row(store: TraceStore, row: sqlite3.Row) -> dict[str, 
         except json.JSONDecodeError:
             cached = None
         if isinstance(cached, dict) and cached.get("id") == row["id"]:
+            if allow_backfill and row["status"] != "active" and _should_backfill(cached, row):
+                return _backfill_summary(store, row)
             if row["status"] != "active":
-                return cached
+                return _with_summary_defaults(cached)
             cached = dict(cached)
             db_count = int(row["record_count"] or 0)
             cached["updated_at"] = row["updated_at"] or cached.get("updated_at") or ""
             cached["record_count"] = db_count
-            cached["turn_count"] = max(int(cached.get("turn_count") or 0), db_count)
             if db_count > 0 and cached.get("status") != "error":
                 cached["status"] = "active"
-            return cached
+            return _with_summary_defaults(cached)
 
     record_count = int(row["record_count"] or 0)
     manifest_entry = {
@@ -274,10 +316,115 @@ def _apply_current_session_state(
         if live_record_count is not None:
             count = max(count, live_record_count)
             session["record_count"] = count
-            session["turn_count"] = max(int(session.get("turn_count") or 0), count)
+            breakdown = session.get("turn_breakdown") or []
+            if breakdown:
+                session["turn_count"] = len(breakdown)
         if count > 0 and session.get("status") != "error":
             session["status"] = "active"
     return session
+
+
+def _as_int(value: object) -> int:
+    """Return value as an int, treating bool, floats and other types as 0."""
+    if isinstance(value, bool) or not isinstance(value, int):
+        return 0
+    return value
+
+
+def _turn_value(record: dict[str, Any]) -> int | None:
+    """Return the record's turn counter, or None when missing or non-integer."""
+    turn = record.get("turn")
+    if isinstance(turn, bool) or not isinstance(turn, int):
+        return None
+    return turn
+
+
+_TURN_TOKEN_FIELDS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_create_tokens",
+    "thinking_tokens",
+)
+
+
+def _turn_stats(record: dict[str, Any]) -> dict[str, Any]:
+    """Extract one record's contribution to a session summary."""
+    usage = _record_usage(record)
+    return {
+        "turn": _turn_value(record),
+        "input_tokens": _as_int(usage.get("input_tokens")),
+        "output_tokens": _as_int(usage.get("output_tokens")),
+        "cache_read_tokens": _as_int(usage.get("cache_read_input_tokens")),
+        "cache_create_tokens": _as_int(usage.get("cache_creation_input_tokens")),
+        "thinking_tokens": _as_int(usage.get("thinking_tokens")),
+        "duration_ms": _as_int(record.get("duration_ms")),
+        "model": _record_model(record) or None,
+    }
+
+
+def _new_turn_entry(turn: int | None) -> dict[str, Any]:
+    entry: dict[str, Any] = {"turn": turn}
+    for field in _TURN_TOKEN_FIELDS:
+        entry[field] = 0
+    entry["total_tokens"] = 0
+    entry["record_count"] = 0
+    entry["duration_ms"] = 0
+    entry["model"] = None
+    return entry
+
+
+def _add_to_turn_entry(entry: dict[str, Any], stats: dict[str, Any]) -> None:
+    for field in _TURN_TOKEN_FIELDS:
+        entry[field] += stats[field]
+    entry["duration_ms"] += stats["duration_ms"]
+    entry["record_count"] += 1
+    if stats["model"]:
+        entry["model"] = stats["model"]
+    entry["total_tokens"] = (
+        entry["input_tokens"]
+        + entry["output_tokens"]
+        + entry["cache_read_tokens"]
+        + entry["cache_create_tokens"]
+    )
+
+
+def _sort_turn_breakdown(breakdown: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Sort ascending by turn, with the null-turn entry last."""
+    return sorted(
+        breakdown,
+        key=lambda entry: (
+            entry.get("turn") is None,
+            entry.get("turn") if entry.get("turn") is not None else 0,
+        ),
+    )
+
+
+def _merge_turn_entry(breakdown: list[dict[str, Any]], stats: dict[str, Any]) -> list[dict[str, Any]]:
+    """Merge one record's stats into an existing breakdown and re-sort it."""
+    merged = [dict(entry) for entry in breakdown]
+    for entry in merged:
+        if entry.get("turn") == stats["turn"]:
+            _add_to_turn_entry(entry, stats)
+            break
+    else:
+        entry = _new_turn_entry(stats["turn"])
+        _add_to_turn_entry(entry, stats)
+        merged.append(entry)
+    return _sort_turn_breakdown(merged)
+
+
+def _build_turn_breakdown(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group records by turn into an ordered breakdown."""
+    entries: dict[int | None, dict[str, Any]] = {}
+    for record in records:
+        stats = _turn_stats(record)
+        entry = entries.get(stats["turn"])
+        if entry is None:
+            entry = _new_turn_entry(stats["turn"])
+            entries[stats["turn"]] = entry
+        _add_to_turn_entry(entry, stats)
+    return _sort_turn_breakdown(list(entries.values()))
 
 
 def _summarize_session(
@@ -299,23 +446,23 @@ def _summarize_session(
     updated_at = _timestamp_from_record(last_record) or updated_at or started_at
     agent = _infer_agent(records, manifest_entry)
     input_tokens = output_tokens = cache_read_tokens = cache_create_tokens = 0
+    thinking_tokens = 0
     models: dict[str, int] = {}
     duration_ms = 0
-    turns: set[int] = set()
 
     for record in records:
-        usage = _record_usage(record)
-        input_tokens += usage.get("input_tokens", 0)
-        output_tokens += usage.get("output_tokens", 0)
-        cache_read_tokens += usage.get("cache_read_input_tokens", 0)
-        cache_create_tokens += usage.get("cache_creation_input_tokens", 0)
+        stats = _turn_stats(record)
+        input_tokens += stats["input_tokens"]
+        output_tokens += stats["output_tokens"]
+        cache_read_tokens += stats["cache_read_tokens"]
+        cache_create_tokens += stats["cache_create_tokens"]
+        thinking_tokens += stats["thinking_tokens"]
         model = _record_model(record)
         if model:
             models[model] = models.get(model, 0) + 1
-        duration_ms += _duration_ms(record)
-        turn = record.get("turn")
-        if isinstance(turn, int):
-            turns.add(turn)
+        duration_ms += stats["duration_ms"]
+
+    breakdown = _build_turn_breakdown(records)
 
     # Status is sticky: any record that failed marks the whole session as
     # "error", matching TraceWriter's cumulative has_error semantics used by
@@ -345,12 +492,14 @@ def _summarize_session(
         "started_at": started_at,
         "updated_at": updated_at,
         "record_count": count,
-        "turn_count": len(turns) if turns else count,
+        "turn_count": len(breakdown) if breakdown else count,
+        "turn_breakdown": breakdown,
         "duration_ms": duration_ms,
         "input_tokens": input_tokens,
         "output_tokens": output_tokens,
         "cache_read_tokens": cache_read_tokens,
         "cache_create_tokens": cache_create_tokens,
+        "thinking_tokens": thinking_tokens,
         "total_tokens": input_tokens + output_tokens + cache_read_tokens + cache_create_tokens,
         "model": _top_key(models) or _record_model(last_record) or "unknown",
         "first_user": _first_user_preview(preview_records),
@@ -431,11 +580,6 @@ def _response_status(record: dict[str, Any]) -> int:
     response = record.get("response")
     status = response.get("status") if isinstance(response, dict) else None
     return status if isinstance(status, int) else 0
-
-
-def _duration_ms(record: dict[str, Any]) -> int:
-    value = record.get("duration_ms")
-    return value if isinstance(value, int) else 0
 
 
 def _record_error(record: dict[str, Any]) -> str:

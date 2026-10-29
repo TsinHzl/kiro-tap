@@ -4,7 +4,7 @@
     "stats_turns": "Turns",
     "stats_tokens": "Total API tokens",
     "stats_time": "Time",
-    "stats_tokens_hint": "Sum of input and output tokens across captured requests; this is not the current Claude Code /context usage.",
+    "stats_tokens_hint": "Total = Input + Output + Cache Read + Cache Write. Thinking / Reasoning is included in Output (Gemini: shown separately) and is not added to Total.",
     "drop_title": "Load Trace File",
     "drop_desc": "Drag & drop a .jsonl trace file, or click to browse",
     "drop_btn": "Choose File",
@@ -86,14 +86,22 @@
     "diff_sys_new": "Current",
     "diff_fallback_warning": "No exact thread match found — showing closest same-model request",
     "diff_select_target": "Compare against:",
-    "diff_select_auto": "Auto"
+    "diff_select_auto": "Auto",
+    "tok_thinking": "Thinking",
+    "tok_total": "Total",
+    "turn_breakdown_title": "Token breakdown by turn",
+    "turn_breakdown_empty": "No token records in the current selection.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "Turn",
+    "turn_col_duration": "Duration (ms)",
+    "thinking_subset_hint": "Thinking / Reasoning is already included in Output and is not counted again in Total."
   },
   "zh-CN": {
     "title": "kiro-tap",
     "stats_turns": "轮次",
     "stats_tokens": "累计 API Token",
     "stats_time": "耗时",
-    "stats_tokens_hint": "跨所有已捕获请求累计 input+output token；不等同于 Claude Code /context 当前上下文占用。",
+    "stats_tokens_hint": "总计 = 输入 + 输出 + 缓存读 + 缓存写。思考/推理已含于输出（Gemini 单独展示），不计入总计。",
     "drop_title": "加载 Trace 文件",
     "drop_desc": "拖放 .jsonl 文件到此处，或点击选择文件",
     "drop_btn": "选择文件",
@@ -175,7 +183,15 @@
     "diff_sys_new": "本次",
     "diff_fallback_warning": "未找到精确线程匹配 — 显示最近的同模型请求",
     "diff_select_target": "对比对象：",
-    "diff_select_auto": "自动"
+    "diff_select_auto": "自动",
+    "tok_thinking": "思考",
+    "tok_total": "总计",
+    "turn_breakdown_title": "按轮次的 Token 明细",
+    "turn_breakdown_empty": "当前筛选范围内没有 token 记录。",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "轮次",
+    "turn_col_duration": "耗时 (ms)",
+    "thinking_subset_hint": "思考/推理已包含在输出内，不重复计入总计。"
   },
   "ja": {
     "title": "kiro-tap",
@@ -264,7 +280,15 @@
     "diff_sys_new": "今回",
     "diff_fallback_warning": "正確なスレッド一致が見つかりません — 同モデルの直近のリクエストを表示",
     "diff_select_target": "比較対象：",
-    "diff_select_auto": "自動"
+    "diff_select_auto": "自動",
+    "tok_thinking": "思考",
+    "tok_total": "合計",
+    "turn_breakdown_title": "ターン別トークン内訳",
+    "turn_breakdown_empty": "現在の選択にトークン記録がありません。",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "ターン",
+    "turn_col_duration": "所要時間 (ms)",
+    "thinking_subset_hint": "思考/推論は出力に既に含まれ、合計には再計上されません。"
   },
   "ko": {
     "title": "kiro-tap",
@@ -353,7 +377,15 @@
     "diff_sys_new": "현재",
     "diff_fallback_warning": "정확한 스레드 일치를 찾을 수 없습니다 — 가장 가까운 동일 모델 요청을 표시",
     "diff_select_target": "비교 대상：",
-    "diff_select_auto": "자동"
+    "diff_select_auto": "자동",
+    "tok_thinking": "사고",
+    "tok_total": "총계",
+    "turn_breakdown_title": "턴별 토큰 내역",
+    "turn_breakdown_empty": "현재 선택에 토큰 기록이 없습니다.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "턴",
+    "turn_col_duration": "소요 시간 (ms)",
+    "thinking_subset_hint": "사고/추론은 출력에 이미 포함되어 있으며 총계에 다시 집계되지 않습니다."
   },
   "fr": {
     "title": "kiro-tap",
@@ -442,7 +474,15 @@
     "diff_sys_new": "Actuel",
     "diff_fallback_warning": "Aucune correspondance de fil exacte trouvée — affichage de la requête du même modèle la plus proche",
     "diff_select_target": "Comparer avec :",
-    "diff_select_auto": "Auto"
+    "diff_select_auto": "Auto",
+    "tok_thinking": "Réflexion",
+    "tok_total": "Total",
+    "turn_breakdown_title": "Détail des tokens par tour",
+    "turn_breakdown_empty": "Aucun enregistrement de token dans la sélection.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "Tour",
+    "turn_col_duration": "Durée (ms)",
+    "thinking_subset_hint": "La réflexion/reasoning est déjà incluse dans la sortie et n'est pas recomptée dans le total."
   },
   "ar": {
     "title": "kiro-tap",
@@ -531,7 +571,15 @@
     "diff_sys_new": "الحالي",
     "diff_fallback_warning": "لم يتم العثور على تطابق دقيق للخيط — عرض أقرب طلب لنفس النموذج",
     "diff_select_target": "مقارنة مع:",
-    "diff_select_auto": "تلقائي"
+    "diff_select_auto": "تلقائي",
+    "tok_thinking": "تفكير",
+    "tok_total": "الإجمالي",
+    "turn_breakdown_title": "تفصيل الرموز حسب الدور",
+    "turn_breakdown_empty": "لا توجد سجلات رموز في التحديد الحالي.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "دور",
+    "turn_col_duration": "المدة (مللي)",
+    "thinking_subset_hint": "الفكر/الاستدلال مضمّن بالفعل في المخرجات ولا يُحتسب مجددا في الإجمالي."
   },
   "de": {
     "title": "kiro-tap",
@@ -620,7 +668,15 @@
     "diff_sys_new": "Aktuelle",
     "diff_fallback_warning": "Keine exakte Thread-Übereinstimmung gefunden — zeige nächste Anfrage desselben Modells",
     "diff_select_target": "Vergleichen mit:",
-    "diff_select_auto": "Auto"
+    "diff_select_auto": "Auto",
+    "tok_thinking": "Denken",
+    "tok_total": "Gesamt",
+    "turn_breakdown_title": "Token-Aufstellung nach Runde",
+    "turn_breakdown_empty": "Keine Token-Datensätze in der aktuellen Auswahl.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "Runde",
+    "turn_col_duration": "Dauer (ms)",
+    "thinking_subset_hint": "Denken/Reasoning ist bereits in der Ausgabe enthalten und wird im Gesamtwert nicht erneut gezählt."
   },
   "ru": {
     "title": "kiro-tap",
@@ -709,7 +765,14 @@
     "diff_sys_new": "Текущий",
     "diff_fallback_warning": "Точное совпадение потока не найдено — показан ближайший запрос той же модели",
     "diff_select_target": "Сравнить с:",
-    "diff_select_auto": "Авто"
+    "diff_select_auto": "Авто",
+    "tok_thinking": "Мышление",
+    "tok_total": "Итого",
+    "turn_breakdown_title": "Разбивка токенов по раундам",
+    "turn_breakdown_empty": "Нет записей токенов в текущем выборе.",
+    "turn_breakdown_unknown_turn": "—",
+    "turn_col": "Раунд",
+    "turn_col_duration": "Длительность (мс)",
+    "thinking_subset_hint": "Мышление/рассуждение уже включено в выходные данные и не учитывается повторно в итоге."
   }
 }
-
