@@ -1,0 +1,48 @@
+kiro_tap/usage.py
+  775114ce5c0ad1c1 5,7-43,51-70
+tests/test_dashboard_tokens.py
+  775114ce5c0ad1c1 1-267
+tests/test_usage_normalize.py
+  775114ce5c0ad1c1 1-140
+kiro_tap/dashboard.py
+  775114ce5c0ad1c1 106,145,147-151,158-160,204-244,253-254,256,263,319-321,327-429,449,454-459,463-465,495-496,502
+kiro_tap/viewer.py
+  775114ce5c0ad1c1 683
+kiro_tap/dashboard.html
+  775114ce5c0ad1c1 246,494-559,854-872,879-885,915-916,988-992,994-999,1079-1083,1085-1090,1400,1436-1441,1447-1451,1455-1569,1640-1641,1708-1709
+kiro_tap/viewer.html
+  775114ce5c0ad1c1 678-709,1527,1531,2096-2100,2253-2258,2801,2806-2811,2823-2828,2830,2833,2838-2904,4739-4743,4772-4792,4796-4801,5200-5204
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "152fea14a7f53b89e530ae3854eacd57142b1952",
+  "prompts": {
+    "775114ce5c0ad1c1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2e177b7-b488-4665-9d27-ee149b6ff66e",
+        "model": "deepseek-v4.1-flash-1017"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 1816,
+      "total_deletions": 211,
+      "accepted_lines": 1687,
+      "overriden_lines": 0
+    },
+    "8032833d99f6eaa5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "77900875-b7ec-4582-9276-af4ee0715e5e",
+        "model": "glm_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 67,
+      "overriden_lines": 0
+    }
+  }
+}
