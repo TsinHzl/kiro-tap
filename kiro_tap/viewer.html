@@ -137,17 +137,23 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .filter-chip:hover { border-color: var(--primary); color: var(--primary); }
 .filter-chip.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 .filter-chip .chip-count { font-size: 10px; margin-left: 4px; opacity: .6; }
-.stats {
+/* ─── Top stats bar ─── */
+.top-bar {
+  position: fixed;
+  top: 0; left: 232px; right: 0;
+  height: 44px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--border);
-  font-size: 12px; color: var(--text-tertiary); flex-shrink: 0;
-  margin-left: 0;
+  align-items: center;
+  gap: 16px;
+  padding: 0 18px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text-tertiary);
+  overflow-x: auto; overflow-y: hidden;
+  z-index: 99;
 }
-.stats .stat-group { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
-.stats .stat-val { font-weight: 600; color: var(--text-secondary); font-family: var(--mono); }
+.top-bar .stat-group { display: flex; align-items: center; gap: 5px; flex-shrink: 0; white-space: nowrap; }
+.top-bar .stat-val { font-weight: 600; color: var(--text-secondary); font-family: var(--mono); }
 .viewer-actions {
   display: flex; flex-direction: column; align-items: stretch; gap: 4px;
   padding: 12px 18px; border-top: 1px solid var(--border); flex-shrink: 0;
@@ -183,7 +189,9 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 .trace-path-bar .tp-sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
 
 /* ─── Layout ─── */
-.main { display: flex; flex: 1; overflow: hidden; margin-left: 232px; min-height: 100vh; }
+.main { display: flex; flex: 1; overflow: hidden; margin-left: 232px; min-height: calc(100vh - 44px); }
+body { padding-top: 44px; }
+body.stats-hidden { padding-top: 0; }
 
 /* ─── Sidebar ─── */
 #sidebar-wrap {
@@ -1218,13 +1226,15 @@ body.standalone .back-to-dashboard { display: inline-flex; }
 body:not(.standalone) .lang-select { display: none; }
 body:not(.standalone) #sidebar-wrap { display: none; }
 body:not(.standalone) .header { display: none; }
+body:not(.standalone) .top-bar { display: none; }
 body:not(.standalone) .main { margin-left: 0; }
+body:not(.standalone) { padding-top: 0; }
 
 /* ─── RTL support ─── */
 [dir="rtl"] #sidebar-wrap { border-right: none; border-left: 1px solid var(--border); }
 [dir="rtl"] .sidebar-item { border-left: none; border-right: 3px solid transparent; }
 [dir="rtl"] .si-model { margin-left: 0; margin-right: auto; }
-[dir="rtl"] .stats { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .top-bar { direction: rtl; }
 [dir="rtl"] .diff-field-arrow { transform: scaleX(-1); }
 
 @media (max-width: 900px) {
@@ -1241,10 +1251,9 @@ body:not(.standalone) .main { margin-left: 0; }
 /* ─── Mobile responsive (≤ 768px) ─── */
 @media (max-width: 768px) {
 
-  /* Header sidebar → top-bar */
+  /* Header sidebar → in-flow top block; stats bar sticks to top */
   .header {
-    position: fixed;
-    top: 0; left: 0;
+    position: static;
     width: 100%; height: auto;
     flex-direction: row;
     flex-wrap: wrap;
@@ -1255,10 +1264,23 @@ body:not(.standalone) .main { margin-left: 0; }
   }
   .header .logo { padding: 0; border-bottom: none; }
   .path-filter { flex-direction: row; flex-wrap: wrap; padding: 6px 0 0; width: 100%; flex: none; }
-  .stats { flex-direction: row; flex-wrap: wrap; padding: 0; border-top: none; border-bottom: 1px solid var(--border); width: 100%; margin: 6px 0 0; }
+  .top-bar {
+    position: sticky;
+    top: 0; left: 0; right: 0;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 12px;
+    width: 100%;
+    overflow: visible;
+    z-index: 100;
+  }
+  .top-bar .stat-group { font-size: 11px; }
   .viewer-actions { flex-direction: row; padding: 0; border-top: none; }
   .header .lang-select { margin: 6px 0 0; width: auto; }
-  .main { margin-left: 0; margin-top: 110px; }
+  .main { margin-left: 0; margin-top: 0; min-height: 0; }
+  body { padding-top: 0; }
 
   /* R1: Stacked layout — sidebar + detail stack vertically */
   body { overflow: auto; }
@@ -1354,13 +1376,6 @@ body:not(.standalone) .main { margin-left: 0; }
     scrollbar-width: none;
   }
   .path-filter::-webkit-scrollbar { display: none; }
-  .stats {
-    margin-left: 0;
-    flex-wrap: wrap;
-    gap: 8px;
-    width: 100%;
-  }
-  .stats .stat-group { font-size: 11px; }
   .viewer-actions {
     width: 100%;
     justify-content: flex-start;
@@ -1506,7 +1521,7 @@ body:not(.standalone) .main { margin-left: 0; }
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 </style>
 </head>
-<body>
+<body class="stats-hidden">
 
 <div class="header">
   <button class="back-to-dashboard" id="back-to-dashboard" type="button" title="Back to Dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
@@ -1517,17 +1532,6 @@ body:not(.standalone) .main { margin-left: 0; }
   </div>
   <div class="divider"></div>
   <div class="path-filter" id="path-filter" style="display:none"></div>
-  <div class="stats" id="stats" style="display:none">
-    <div class="stat-group"><span id="label-turns">Turns</span> <span class="stat-val" id="stat-turns">0</span></div>
-    <div class="stat-group"><span id="label-tokens">Tokens</span> <span class="stat-val" id="stat-tokens">0</span></div>
-    <div class="stat-group" id="stat-input-group" style="display:none"><span style="color:var(--primary)">&#9679;</span><span>In</span> <span class="stat-val" id="stat-input">0</span></div>
-    <div class="stat-group" id="stat-output-group" style="display:none"><span style="color:var(--green)">&#9679;</span><span>Out</span> <span class="stat-val" id="stat-output">0</span></div>
-    <div class="stat-group" id="stat-cache-read-group" style="display:none"><span style="color:var(--cyan)">&#9679;</span><span>Cache R</span> <span class="stat-val" id="stat-cache-read">0</span></div>
-    <div class="stat-group" id="stat-cache-write-group" style="display:none"><span style="color:var(--amber)">&#9679;</span><span>Cache W</span> <span class="stat-val" id="stat-cache-write">0</span></div>
-    <div class="stat-group" id="stat-thinking-group" style="display:none"><span style="color:var(--orange)">&#9679;</span><span id="label-thinking" data-i18n="tok_thinking">Think</span> <span class="stat-val" id="stat-thinking">0</span></div>
-    <div class="stat-group"><span id="label-time">Time</span> <span class="stat-val" id="stat-duration">0s</span></div>
-    <div id="live-status" style="display:none;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500;align-items:center;gap:6px;"></div>
-  </div>
   <div id="turn-breakdown-bar" class="turn-breakdown-card" style="display:none"></div>
   <div class="viewer-actions" id="viewer-actions" style="display:none"></div>
   <select class="lang-select" id="lang-select" onchange="setLang(this.value)">
@@ -1540,6 +1544,18 @@ body:not(.standalone) .main { margin-left: 0; }
     <option value="de">Deutsch</option>
     <option value="ru">Русский</option>
   </select>
+</div>
+
+<div class="top-bar" id="stats" style="display:none">
+  <div class="stat-group"><span id="label-turns">Turns</span> <span class="stat-val" id="stat-turns">0</span></div>
+  <div class="stat-group"><span id="label-tokens">Tokens</span> <span class="stat-val" id="stat-tokens">0</span></div>
+  <div class="stat-group" id="stat-input-group" style="display:none"><span style="color:var(--primary)">&#9679;</span><span>In</span> <span class="stat-val" id="stat-input">0</span></div>
+  <div class="stat-group" id="stat-output-group" style="display:none"><span style="color:var(--green)">&#9679;</span><span>Out</span> <span class="stat-val" id="stat-output">0</span></div>
+  <div class="stat-group" id="stat-cache-read-group" style="display:none"><span style="color:var(--cyan)">&#9679;</span><span>Cache R</span> <span class="stat-val" id="stat-cache-read">0</span></div>
+  <div class="stat-group" id="stat-cache-write-group" style="display:none"><span style="color:var(--amber)">&#9679;</span><span>Cache W</span> <span class="stat-val" id="stat-cache-write">0</span></div>
+  <div class="stat-group" id="stat-thinking-group" style="display:none"><span style="color:var(--orange)">&#9679;</span><span id="label-thinking" data-i18n="tok_thinking">Think</span> <span class="stat-val" id="stat-thinking">0</span></div>
+  <div class="stat-group"><span id="label-time">Time</span> <span class="stat-val" id="stat-duration">0s</span></div>
+  <div id="live-status" style="display:none;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500;align-items:center;gap:6px;"></div>
 </div>
 
 <div class="trace-path-bar" id="trace-path-bar"></div>
@@ -2354,6 +2370,7 @@ function renderEmptyTraceState() {
   $('#sidebar-wrap').style.display = 'none';
   $('#detail').style.display = 'none';
   $('#stats').style.display = 'none';
+  document.body.classList.add('stats-hidden');
   $('#path-filter').style.display = 'none';
   renderTracePathBar();
   const dropZone = $('#drop-zone');
@@ -2448,6 +2465,7 @@ function renderLiveWaitingState() {
   $('#detail').style.display = '';
   $('#detail').innerHTML = '<div class="empty-state" role="status" aria-live="polite"><div style="font-size:48px;margin-bottom:16px;">📡</div><h2 style="margin-bottom:8px;color:var(--text);font-size:18px;">Waiting for API calls...</h2><p style="color:var(--text-secondary);">Start using Claude Code to see traces here in real-time</p></div>';
   $('#stats').style.display = 'none';
+  document.body.classList.add('stats-hidden');
   $('#path-filter').style.display = 'none';
   updateHistoryDeleteButton();
 }
@@ -2609,6 +2627,7 @@ function renderApp(preserveDetail) {
   $('#sidebar').style.display = '';
   $('#detail').style.display = '';
   $('#stats').style.display = '';
+  document.body.classList.remove('stats-hidden');
   $('#path-filter').style.display = '';
   const pathCounts = {};
   entries.forEach(e => { const p = getPath(e); pathCounts[p] = (pathCounts[p] || 0) + 1; });
