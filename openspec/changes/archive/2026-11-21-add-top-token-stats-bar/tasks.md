@@ -1,6 +1,6 @@
 # 任务清单：add-top-token-stats-bar
 
-## 状态：DONE
+## 状态：ARCHIVED
 
 ## 变更类型
 
