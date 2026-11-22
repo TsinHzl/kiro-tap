@@ -1,0 +1,39 @@
+kiro_tap/token_estimate.py
+  c1a3db23dfaefe86 1-69
+kiro_tap/aws_event_stream.py
+  c1a3db23dfaefe86 372-378
+kiro_tap/dashboard.html
+  c1a3db23dfaefe86 1017,1109,1532-1534,1544-1546,1548-1553
+kiro_tap/dashboard.py
+  c1a3db23dfaefe86 152-153,363,383-384,455,466-467,511
+kiro_tap/viewer.html
+  c1a3db23dfaefe86 2821,2826,2836-2842,5226-5227,5236
+tests/test_usage_estimate_injection.py
+  c1a3db23dfaefe86 1-168
+kiro_tap/proxy.py
+  c1a3db23dfaefe86 22,425-482,515-561
+tests/test_token_estimate.py
+  c1a3db23dfaefe86 1-48
+tests/test_aws_event_stream.py
+  c1a3db23dfaefe86 163,168-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "2ee85b0d945322ebed9c008573e693c3b4c5c6a4",
+  "prompts": {
+    "c1a3db23dfaefe86": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fc91036f-9858-4441-9fb1-9a9e79396c51",
+        "model": "deepseek_for_coding"
+      },
+      "human_author": "TsinHzl <tsinhzl@icloud.com>",
+      "messages": [],
+      "total_additions": 508,
+      "total_deletions": 90,
+      "accepted_lines": 437,
+      "overriden_lines": 0
+    }
+  }
+}
