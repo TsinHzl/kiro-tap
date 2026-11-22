@@ -149,6 +149,8 @@ def merge_record_into_summary(
     summary["cache_read_tokens"] = int(summary.get("cache_read_tokens") or 0) + stats["cache_read_tokens"]
     summary["cache_create_tokens"] = int(summary.get("cache_create_tokens") or 0) + stats["cache_create_tokens"]
     summary["thinking_tokens"] = int(summary.get("thinking_tokens") or 0) + stats["thinking_tokens"]
+    if stats.get("usage_estimated"):
+        summary["usage_estimated"] = True
     summary["total_tokens"] = (
         summary["input_tokens"]
         + summary["output_tokens"]
@@ -358,6 +360,7 @@ def _turn_stats(record: dict[str, Any]) -> dict[str, Any]:
         "cache_read_tokens": _as_int(usage.get("cache_read_input_tokens")),
         "cache_create_tokens": _as_int(usage.get("cache_creation_input_tokens")),
         "thinking_tokens": _as_int(usage.get("thinking_tokens")),
+        "usage_estimated": bool(usage.get("estimated")),
         "duration_ms": _as_int(record.get("duration_ms")),
         "model": _record_model(record) or None,
     }
@@ -377,6 +380,8 @@ def _new_turn_entry(turn: int | None) -> dict[str, Any]:
 def _add_to_turn_entry(entry: dict[str, Any], stats: dict[str, Any]) -> None:
     for field in _TURN_TOKEN_FIELDS:
         entry[field] += stats[field]
+    if stats.get("usage_estimated"):
+        entry["usage_estimated"] = True
     entry["duration_ms"] += stats["duration_ms"]
     entry["record_count"] += 1
     if stats["model"]:
@@ -447,6 +452,7 @@ def _summarize_session(
     agent = _infer_agent(records, manifest_entry)
     input_tokens = output_tokens = cache_read_tokens = cache_create_tokens = 0
     thinking_tokens = 0
+    usage_estimated = False
     models: dict[str, int] = {}
     duration_ms = 0
 
@@ -457,6 +463,8 @@ def _summarize_session(
         cache_read_tokens += stats["cache_read_tokens"]
         cache_create_tokens += stats["cache_create_tokens"]
         thinking_tokens += stats["thinking_tokens"]
+        if stats.get("usage_estimated"):
+            usage_estimated = True
         model = _record_model(record)
         if model:
             models[model] = models.get(model, 0) + 1
@@ -500,6 +508,7 @@ def _summarize_session(
         "cache_read_tokens": cache_read_tokens,
         "cache_create_tokens": cache_create_tokens,
         "thinking_tokens": thinking_tokens,
+        "usage_estimated": usage_estimated,
         "total_tokens": input_tokens + output_tokens + cache_read_tokens + cache_create_tokens,
         "model": _top_key(models) or _record_model(last_record) or "unknown",
         "first_user": _first_user_preview(preview_records),

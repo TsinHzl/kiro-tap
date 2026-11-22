@@ -2818,10 +2818,12 @@ function applyFilter(preserveDetail) {
   filtered.sort((a, b) => compareTurns(a.turn, b.turn));
   let totalTokens = 0, totalDuration = 0;
   let sumInput = 0, sumOutput = 0, sumCacheRead = 0, sumCacheCreate = 0, sumThinking = 0;
+  let anyEstimated = false;
   filtered.forEach(e => {
     totalDuration += e.duration_ms || 0;
     const u = getUsage(e);
     if (u) {
+      if (u.estimated) anyEstimated = true;
       totalTokens += toFinite(u.input_tokens) + toFinite(u.output_tokens) + toFinite(u.cache_read_input_tokens) + toFinite(u.cache_creation_input_tokens);
       sumInput += toFinite(u.input_tokens);
       sumOutput += toFinite(u.output_tokens);
@@ -2831,7 +2833,13 @@ function applyFilter(preserveDetail) {
     }
   });
   $('#stat-turns').textContent = filtered.length;
-  $('#stat-tokens').textContent = totalTokens.toLocaleString();
+  $('#stat-tokens').textContent = (anyEstimated ? '≈' : '') + totalTokens.toLocaleString();
+  const tokensLabel = $('#label-tokens');
+  if (tokensLabel && tokensLabel.parentElement) {
+    const hint = anyEstimated ? t('stats_tokens_estimated_hint') : t('stats_tokens_hint');
+    tokensLabel.parentElement.title = hint;
+    tokensLabel.parentElement.setAttribute('aria-label', hint);
+  }
   $('#stat-duration').textContent = fmtDuration(totalDuration);
   // Token breakdown in header
   if (totalTokens > 0) {
@@ -5215,6 +5223,8 @@ function renderResponseContent(body, contextOnly = false) {
 }
 
 function renderTokenUsage(u) {
+  // Estimated values (upstream returned no token counters) are marked with "≈".
+  const approx = u.estimated ? '≈' : '';
   const items = [
     { label: t('tok_input'), val: toFinite(u.input_tokens), color: 'var(--primary)' },
     { label: t('tok_output'), val: toFinite(u.output_tokens), color: 'var(--green)' },
@@ -5223,7 +5233,7 @@ function renderTokenUsage(u) {
     { label: t('tok_thinking'), val: toFinite(u.thinking_tokens), color: 'var(--orange)' },
   ];
   return `<div class="token-bar">${items.map(i =>
-    `<div class="tok-item"><span class="tok-dot" style="background:${i.color}"></span><span class="tok-label">${i.label}</span><span class="tok-val">${i.val.toLocaleString()}</span></div>`
+    `<div class="tok-item"><span class="tok-dot" style="background:${i.color}"></span><span class="tok-label">${i.label}</span><span class="tok-val">${approx}${i.val.toLocaleString()}</span></div>`
   ).join('')}</div>`;
 }
 

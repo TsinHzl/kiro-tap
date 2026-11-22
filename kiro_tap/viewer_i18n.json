@@ -94,7 +94,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "Turn",
     "turn_col_duration": "Duration (ms)",
-    "thinking_subset_hint": "Thinking / Reasoning is already included in Output and is not counted again in Total."
+    "thinking_subset_hint": "Thinking / Reasoning is already included in Output and is not counted again in Total.",
+    "stats_tokens_estimated_hint": "Estimated: this upstream returns no token counters, so values are approximated from payload size."
   },
   "zh-CN": {
     "title": "kiro-tap",
@@ -191,7 +192,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "轮次",
     "turn_col_duration": "耗时 (ms)",
-    "thinking_subset_hint": "思考/推理已包含在输出内，不重复计入总计。"
+    "thinking_subset_hint": "思考/推理已包含在输出内，不重复计入总计。",
+    "stats_tokens_estimated_hint": "估算值：该上游不返回 token 计数，数值由 payload 长度近似推算。"
   },
   "ja": {
     "title": "kiro-tap",
@@ -288,7 +290,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "ターン",
     "turn_col_duration": "所要時間 (ms)",
-    "thinking_subset_hint": "思考/推論は出力に既に含まれ、合計には再計上されません。"
+    "thinking_subset_hint": "思考/推論は出力に既に含まれ、合計には再計上されません。",
+    "stats_tokens_estimated_hint": "推定値：この上流はトークン数を返さないため、ペイロード長から概算しています。"
   },
   "ko": {
     "title": "kiro-tap",
@@ -385,7 +388,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "턴",
     "turn_col_duration": "소요 시간 (ms)",
-    "thinking_subset_hint": "사고/추론은 출력에 이미 포함되어 있으며 총계에 다시 집계되지 않습니다."
+    "thinking_subset_hint": "사고/추론은 출력에 이미 포함되어 있으며 총계에 다시 집계되지 않습니다.",
+    "stats_tokens_estimated_hint": "추정값: 이 업스트림은 토큰 수를 반환하지 않아 페이로드 길이로 근사합니다."
   },
   "fr": {
     "title": "kiro-tap",
@@ -482,7 +486,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "Tour",
     "turn_col_duration": "Durée (ms)",
-    "thinking_subset_hint": "La réflexion/reasoning est déjà incluse dans la sortie et n'est pas recomptée dans le total."
+    "thinking_subset_hint": "La réflexion/reasoning est déjà incluse dans la sortie et n'est pas recomptée dans le total.",
+    "stats_tokens_estimated_hint": "Estimation : cet amont ne renvoie pas de compteurs de jetons ; valeurs approchées d'après la taille du payload."
   },
   "ar": {
     "title": "kiro-tap",
@@ -579,7 +584,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "دور",
     "turn_col_duration": "المدة (مللي)",
-    "thinking_subset_hint": "الفكر/الاستدلال مضمّن بالفعل في المخرجات ولا يُحتسب مجددا في الإجمالي."
+    "thinking_subset_hint": "الفكر/الاستدلال مضمّن بالفعل في المخرجات ولا يُحتسب مجددا في الإجمالي.",
+    "stats_tokens_estimated_hint": "تقدير: هذا المصدر لا يعيد عدّادات الرموز، لذا القيم تقريبية بناءً على حجم الحمولة."
   },
   "de": {
     "title": "kiro-tap",
@@ -676,7 +682,8 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "Runde",
     "turn_col_duration": "Dauer (ms)",
-    "thinking_subset_hint": "Denken/Reasoning ist bereits in der Ausgabe enthalten und wird im Gesamtwert nicht erneut gezählt."
+    "thinking_subset_hint": "Denken/Reasoning ist bereits in der Ausgabe enthalten und wird im Gesamtwert nicht erneut gezählt.",
+    "stats_tokens_estimated_hint": "Schätzung: Diese Gegenstelle liefert keine Token-Zähler; Werte werden aus der Payload-Größe genähert."
   },
   "ru": {
     "title": "kiro-tap",
@@ -773,6 +780,7 @@
     "turn_breakdown_unknown_turn": "—",
     "turn_col": "Раунд",
     "turn_col_duration": "Длительность (мс)",
-    "thinking_subset_hint": "Мышление/рассуждение уже включено в выходные данные и не учитывается повторно в итоге."
+    "thinking_subset_hint": "Мышление/рассуждение уже включено в выходные данные и не учитывается повторно в итоге.",
+    "stats_tokens_estimated_hint": "Оценка: вышестоящий сервис не возвращает счётчики токенов; значения приблизительны по размеру payload."
   }
 }

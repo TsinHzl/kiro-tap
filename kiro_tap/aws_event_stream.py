@@ -369,13 +369,13 @@ class AWSEventStreamReassembler:
                 acc.complete = True
 
         elif event_type == EVENT_TYPE_METERING:
-            # usage is in "credits" units for Kiro, but we map to token fields
-            # for viewer compatibility. Kiro also provides cache token counts.
-            usage_val = payload.get("usage", 0)
-            self._metering = {
-                "input_tokens": int(usage_val) if isinstance(usage_val, (int, float)) else 0,
-                "output_tokens": 0,
-            }
+            # NOTE: `usage` here is in *credits*, not tokens. Mapping it to
+            # `input_tokens` produced meaningless values (int(0.0403) == 0).
+            # Keep it as its own field; only the cache counters are real tokens.
+            self._metering = {}
+            credits = payload.get("usage")
+            if isinstance(credits, (int, float)):
+                self._metering["credits_used"] = float(credits)
             cache_read = payload.get("cacheReadInputTokens")
             cache_create = payload.get("cacheCreationInputTokens")
             if cache_read is not None:

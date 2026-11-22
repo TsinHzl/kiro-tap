@@ -160,12 +160,14 @@ def test_reassembler_metering() -> None:
     r = AWSEventStreamReassembler()
     r.feed_bytes(build_frame(
         {":message-type": "event", ":event-type": "meteringEvent"},
-        json.dumps({"usage": 100, "cacheReadInputTokens": 20, "cacheCreationInputTokens": 5}).encode(),
+        json.dumps({"usage": 0.0403, "cacheReadInputTokens": 20, "cacheCreationInputTokens": 5}).encode(),
     ))
     result = r.reconstruct()
     assert result is not None
     usage = result["usage"]
-    assert usage["input_tokens"] == 100
+    # `usage` is credits, not tokens: it must never be reported as input_tokens.
+    assert "input_tokens" not in usage
+    assert usage["credits_used"] == 0.0403
     assert usage["cache_read_input_tokens"] == 20
     assert usage["cache_creation_input_tokens"] == 5
 

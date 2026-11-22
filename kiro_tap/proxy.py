@@ -19,6 +19,7 @@ from yarl import URL
 
 from kiro_tap.aws_event_stream import AWSEventStreamReassembler
 from kiro_tap.sse import SSEReassembler
+from kiro_tap.token_estimate import estimate_payload_tokens
 from kiro_tap.trace import TraceWriter
 from kiro_tap.usage import normalize_usage
 
@@ -421,6 +422,64 @@ async def _handle_non_streaming(
     )
 
 
+_COMPLETION_PATH_PREFIXES: tuple[str, ...] = (
+    "/v1/responses",
+    "/v1/chat/completions",
+    "/v1/completions",
+    "/v1/messages",
+    "/v1/complete",
+    "/responses",
+    "/chat/completions",
+    "/completions",
+)
+
+_TOKEN_FIELDS_TO_ESTIMATE = ("input_tokens", "output_tokens")
+
+
+def _is_ai_request(path_qs: str, headers: dict) -> bool:
+    """Return True when the request is an AI completion call worth estimating."""
+    clean = (path_qs.split("?", 1)[0]).rstrip("/") or "/"
+    target = ""
+    for key, value in headers.items():
+        if str(key).lower() == "x-amz-target":
+            target = str(value)
+            break
+    if "GenerateAssistantResponse" in target:
+        return True
+    if clean.endswith("/count_tokens"):
+        # Token counting calls report a real count and must not be overwritten.
+        return False
+    return any(clean == prefix or clean.startswith(prefix + "/") for prefix in _COMPLETION_PATH_PREFIXES)
+
+
+def _has_token_count(usage: object, field: str) -> bool:
+    """Return True when the upstream reported field, aliases resolved.
+
+    A reported zero counts as reported: Anthropic returns ``input_tokens: 0``
+    on a full cache hit, and overwriting it with an estimate would lose the
+    real value and double-count the cached prefix in ``total_tokens``.
+    """
+    if not isinstance(usage, dict):
+        return False
+    value = normalize_usage(usage).get(field)
+    if value is None:
+        return False
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+
+
+def _reported_cache_tokens(usage: object) -> int:
+    """Return the cache counters the upstream already accounted for."""
+    if not isinstance(usage, dict):
+        return 0
+    normalized = normalize_usage(usage)
+    total = 0
+    for field in ("cache_read_input_tokens", "cache_creation_input_tokens"):
+        value = normalized.get(field)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            total += int(value)
+    return total
+
+
 def _build_record(
     req_id: str,
     turn: int,
@@ -453,6 +512,53 @@ def _build_record(
             "body": resp_body,
         },
     }
+    # When the upstream omits token counters (e.g. Kiro /v1/responses only
+    # returns credits), estimate only the fields that are actually missing and
+    # flag them so the UI can mark the numbers as approximate. Upstream usage
+    # keys (credits, context percentage) are preserved; real counts always win.
+    if status < 400 and isinstance(resp_body, dict) and _is_ai_request(path_qs, req_headers):
+        source = resp_body.get("usage")
+        wrapped = isinstance(source, dict)
+        probe = source if wrapped else resp_body
+        missing = [field for field in _TOKEN_FIELDS_TO_ESTIMATE if not _has_token_count(probe, field)]
+        if missing and resp_body.get("type") != "error":
+            # Estimation scans the payload synchronously on the event loop.
+            # Measured cost: ~0.06 ms for a 20 KB payload, ~4 ms for 1 MB —
+            # acceptable here; move to the writer thread pool if multi-MB
+            # contexts become common.
+            try:
+                cache_tokens = _reported_cache_tokens(probe)
+                candidates = {
+                    # The request estimate covers cached prefixes too, so net
+                    # them out to keep total_tokens from counting them twice.
+                    "input_tokens": max(0, estimate_payload_tokens(req_body) - cache_tokens),
+                    "output_tokens": estimate_payload_tokens(
+                        resp_body.get("output") or resp_body.get("choices") or resp_body.get("content")
+                    ),
+                }
+            except Exception:
+                log.warning("token estimation failed; recording raw usage", exc_info=True)
+                candidates = {}
+            usage = dict(source) if wrapped else {}
+            if not wrapped:
+                # Flat bodies carry real counts at the top level; copy them
+                # into the usage we are about to create so they are not
+                # masked (dashboard stops at a non-empty usage dict).
+                flat = normalize_usage(resp_body)
+                for field in _TOKEN_FIELDS_TO_ESTIMATE:
+                    value = flat.get(field)
+                    if isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0:
+                        usage.setdefault(field, value)
+            injected = False
+            for field in missing:
+                if candidates.get(field):
+                    usage[field] = candidates[field]
+                    injected = True
+            if injected:
+                usage["estimated"] = True
+                body = dict(resp_body)
+                body["usage"] = usage
+                record["response"]["body"] = body
     if sse_events:
         record["response"]["sse_events"] = sse_events
     if upstream_base_url:

@@ -1014,6 +1014,7 @@ const DASHBOARD_I18N = {
     metric_cache_write: "Cache W",
     metric_thinking: "Thinking",
     metric_total_tokens: "Total Tokens",
+    estimated_tokens_hint: "Estimated: this upstream returns no token counters, so values are approximated from payload size.",
     turn_breakdown_title: "Token breakdown by turn",
     turn_breakdown_empty: "No token records in the current selection.",
     turn_breakdown_unknown_turn: "—",
@@ -1105,6 +1106,7 @@ const DASHBOARD_I18N = {
     metric_cache_write: "缓存写",
     metric_thinking: "思考",
     metric_total_tokens: "总 Token",
+    estimated_tokens_hint: "估算值：该上游不返回 token 计数，数值由 payload 长度近似推算。",
     turn_breakdown_title: "按轮次的 Token 明细",
     turn_breakdown_empty: "当前筛选范围内没有 token 记录。",
     turn_breakdown_unknown_turn: "—",
@@ -1527,8 +1529,9 @@ function renderOverviewTurnBreakdown(sessions) {
     </table>`;
 }
 
-function tokenFieldHtml(label, value) {
-  return `<div class="detail-token-field"><span class="detail-token-label">${esc(label)}</span><span class="detail-token-value">${fmtNumber(value)}</span></div>`;
+function tokenFieldHtml(label, value, title) {
+  const titleAttr = title ? ` title="${esc(title)}"` : "";
+  return `<div class="detail-token-field"><span class="detail-token-label"${titleAttr}>${esc(label)}</span><span class="detail-token-value">${esc(String(value))}</span></div>`;
 }
 
 function renderDetailTokenSummary(session) {
@@ -1538,13 +1541,16 @@ function renderDetailTokenSummary(session) {
     return;
   }
   el.classList.remove("hidden");
+  const approx = session.usage_estimated ? "≈" : "";
+  const approxTitle = session.usage_estimated ? t("estimated_tokens_hint") : "";
+  const field = (label, value) => tokenFieldHtml(label, approx + fmtNumber(value || 0), approxTitle);
   el.innerHTML = [
-    tokenFieldHtml(t("metric_input_tokens"), session.input_tokens || 0),
-    tokenFieldHtml(t("metric_output_tokens"), session.output_tokens || 0),
-    tokenFieldHtml(t("metric_cache_read"), session.cache_read_tokens || 0),
-    tokenFieldHtml(t("metric_cache_write"), session.cache_create_tokens || 0),
-    tokenFieldHtml(t("metric_thinking"), session.thinking_tokens || 0),
-    tokenFieldHtml(t("metric_total_tokens"), session.total_tokens || 0),
+    field(t("metric_input_tokens"), session.input_tokens),
+    field(t("metric_output_tokens"), session.output_tokens),
+    field(t("metric_cache_read"), session.cache_read_tokens),
+    field(t("metric_cache_write"), session.cache_create_tokens),
+    field(t("metric_thinking"), session.thinking_tokens),
+    field(t("metric_total_tokens"), session.total_tokens),
   ].join("");
 }
 
